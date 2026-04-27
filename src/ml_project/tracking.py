@@ -15,6 +15,8 @@ def log_training_run(
     model_name: str,
     model,
     schema: FeatureSchema,
+    train_frame: pd.DataFrame,
+    valid_frame: pd.DataFrame,
     metrics_frame: pd.DataFrame,
     processed_rows: int,
     validation_rows: int,
@@ -36,12 +38,19 @@ def log_training_run(
     with mlflow.start_run(run_name=model_name):
         mlflow.log_params(params)
         mlflow.log_metrics({key: float(value) for key, value in metrics.items()})
+        log_dataset(train_frame, name="processed_train", context="training")
+        log_dataset(valid_frame, name="processed_validation", context="validation")
         mlflow.log_dict(schema.to_dict(), "schema.json")
         mlflow.catboost.log_model(
             model.model,
             name="model",
             metadata=run_metadata(schema),
         )
+
+
+def log_dataset(frame: pd.DataFrame, *, name: str, context: str):
+    dataset = mlflow.data.from_pandas(frame, name=name)
+    mlflow.log_input(dataset, context=context)
 
 
 def run_metadata(schema: FeatureSchema) -> dict[str, Any]:

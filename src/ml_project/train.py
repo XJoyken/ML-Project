@@ -65,6 +65,8 @@ def train_model(
             model_name=model_name,
             model=model,
             schema=schema,
+            train_frame=train_frame,
+            valid_frame=valid_frame,
             metrics_frame=metrics_frame,
             processed_rows=len(processed),
             validation_rows=len(valid_frame),
