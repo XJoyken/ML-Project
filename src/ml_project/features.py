@@ -34,15 +34,6 @@ class FeatureSchema:
             "categorical_features": self.categorical_features,
         }
 
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "FeatureSchema":
-        return cls(
-            target_column=payload.get("target_column", TARGET_COLUMN),
-            numeric_features=list(payload.get("numeric_features", [])),
-            categorical_features=list(payload.get("categorical_features", [])),
-        )
-
-
 def build_base_features(listings: pd.DataFrame) -> pd.DataFrame:
     return listings[[*BASE_NUMERIC_FEATURES, *CATEGORICAL_FEATURES]].copy()
 

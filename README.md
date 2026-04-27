@@ -7,6 +7,7 @@ Ml project is related to determining the pricing of apartments in Almaty and det
 - `src/ml_project/features.py`: feature schema, base listing features, POI features, processed dataset builders.
 - `src/ml_project/models.py`: model implementations and model factory.
 - `src/ml_project/train.py`: train/evaluate functions.
+- `src/ml_project/tracking.py`: MLflow experiment logging.
 - `src/ml_project/predict.py`: prediction, verdict, and human-readable explanation.
 - `src/almaty_price_baseline.py`: thin wrapper and CLI entrypoint.
 
@@ -23,7 +24,10 @@ Then run commands directly:
 src/almaty_price_baseline.py train --model catboost
 src/almaty_price_baseline.py evaluate --model catboost
 src/almaty_price_baseline.py predict --model catboost --listing-id 1009196093
+mlflow ui
 ```
+
+Training logs params, metrics, schema, and the CatBoost model to the `almaty-apartment-prices` MLflow experiment.
 
 Predict on a custom listing with inline JSON:
 

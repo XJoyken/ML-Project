@@ -29,6 +29,7 @@ def predict_price(
         poi_sources=poi_sources,
         processed_path=None,
         save_processed=False,
+        log_to_mlflow=False,
     )
     reference_ads = training["listings"]
     poi_catalog = training["poi_catalog"]

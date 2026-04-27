@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 
+from .constants import MLFLOW_EXPERIMENT_NAME
 from .predict import predict_price
 from .train import evaluate_model, train_model
 
@@ -18,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--model", default="catboost")
     train_parser.add_argument("--test-size", type=float, default=0.2)
     train_parser.add_argument("--random-state", type=int, default=42)
+    train_parser.add_argument("--experiment-name", default=MLFLOW_EXPERIMENT_NAME)
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a model.")
     evaluate_parser.add_argument("--model", default="catboost")
@@ -39,12 +41,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command in {None, "train"}:
+        experiment_name = args.experiment_name if args.command else MLFLOW_EXPERIMENT_NAME
         result = train_model(
             args.model if args.command else "catboost",
             test_size=args.test_size if args.command else 0.2,
             random_state=args.random_state if args.command else 42,
+            experiment_name=experiment_name,
         )
         print(f"Processed rows: {len(result['processed_frame']):,}")
+        print(f"MLflow experiment: {experiment_name}")
         print(result["metrics_frame"].round(4).to_string(index=False))
         return 0
 

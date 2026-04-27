@@ -1,4 +1,4 @@
-from .constants import PROCESSED_DATASET_PATH
+from .constants import MLFLOW_EXPERIMENT_NAME, PROCESSED_DATASET_PATH
 from .data import get_listing_input, load_listings, normalize_listing_frame
 from .features import (
     FeatureSchema,
@@ -30,6 +30,7 @@ __all__ = [
     "load_poi_catalog",
     "normalize_listing_frame",
     "PoiCatalog",
+    "MLFLOW_EXPERIMENT_NAME",
     "PROCESSED_DATASET_PATH",
     "predict_price",
     "train_model",

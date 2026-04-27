@@ -6,12 +6,18 @@ from typing import Any
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .constants import POI_SOURCE_FILES, PROCESSED_DATASET_PATH, TARGET_COLUMN
+from .constants import (
+    MLFLOW_EXPERIMENT_NAME,
+    POI_SOURCE_FILES,
+    PROCESSED_DATASET_PATH,
+    TARGET_COLUMN,
+)
 from .data import load_listings
 from .features import build_processed_dataset
 from .metrics import calculate_metrics
 from .models import create_model
 from .poi import load_poi_catalog
+from .tracking import log_training_run
 
 
 def train_model(
@@ -24,6 +30,8 @@ def train_model(
     random_state: int = 42,
     model_params: dict[str, object] | None = None,
     save_processed: bool = True,
+    log_to_mlflow: bool = True,
+    experiment_name: str = MLFLOW_EXPERIMENT_NAME,
 ) -> dict[str, Any]:
     listings = load_listings(ads_path=ads_path)
     poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
@@ -50,6 +58,19 @@ def train_model(
             }
         ]
     )
+
+    if log_to_mlflow:
+        log_training_run(
+            experiment_name=experiment_name,
+            model_name=model_name,
+            model=model,
+            schema=schema,
+            metrics_frame=metrics_frame,
+            processed_rows=len(processed),
+            validation_rows=len(valid_frame),
+            test_size=test_size,
+            random_state=random_state,
+        )
 
     return {
         "listings": listings,
@@ -79,4 +100,5 @@ def evaluate_model(
         random_state=random_state,
         model_params=model_params,
         save_processed=False,
+        log_to_mlflow=False,
     )

@@ -3,4 +3,7 @@
 __pycache__/
 .ipynb_checkpoints/
 catboost_info/
+mlruns/
+mlflow.db*
+mlartifacts/
 /.idea

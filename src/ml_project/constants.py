@@ -9,6 +9,7 @@ DATA_DIR = ROOT_DIR / "datasets"
 PROCESSED_DIR = DATA_DIR / "processed"
 PROCESSED_DATASET_PATH = PROCESSED_DIR / "ads_model_v1.csv"
 DEFAULT_MODEL_NAME = "catboost"
+MLFLOW_EXPERIMENT_NAME = "almaty-apartment-prices"
 
 POI_SOURCE_FILES = {
     "metro": DATA_DIR / "almaty_metro.csv",
