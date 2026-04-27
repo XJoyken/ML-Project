@@ -2,7 +2,8 @@
 Ml project is related to determining the pricing of apartments in Almaty and determining the profitability of ads on the krisha.kz, based on the area, floor, distances to key objects, and so on. It also includes a recommendation system and the flexible use of the ML model through the processing of requests using DL.
 
 ## Structure
-- `src/ml_project/data.py`: loading and normalization of listings, loading POI csv, and `PoiCatalog`.
+- `src/ml_project/data.py`: loading and normalization of listings.
+- `src/ml_project/poi.py`: loading POI csv files, spatial index, and POI distance/count features.
 - `src/ml_project/features.py`: feature schema, base listing features, POI features, processed dataset builders.
 - `src/ml_project/models.py`: model implementations and model factory.
 - `src/ml_project/train.py`: train/evaluate functions and artifact saving.

@@ -12,9 +12,10 @@ from .constants import (
     VERDICT_OVERPRICED_THRESHOLD,
     VERDICT_UNDERVALUED_THRESHOLD,
 )
-from .data import get_listing_input, load_listings, load_poi_catalog
+from .data import get_listing_input, load_listings
 from .features import build_inference_frame
 from .models import load_model
+from .poi import load_poi_catalog
 from .train import artifact_dir, load_schema, schema_path
 
 

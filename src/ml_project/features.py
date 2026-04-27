@@ -13,7 +13,8 @@ from .constants import (
     TARGET_COLUMN,
     TARGET_LOG_COLUMN,
 )
-from .data import PoiCatalog, normalize_listing_frame, validate_inference_frame
+from .data import normalize_listing_frame, validate_inference_frame
+from .poi import PoiCatalog
 
 
 @dataclass(slots=True)
@@ -50,11 +51,9 @@ def build_poi_features(listings: pd.DataFrame, poi_catalog: PoiCatalog) -> pd.Da
     return poi_catalog.build_feature_frame(listings)
 
 
-def build_processed_dataset(
+def build_feature_frame(
     listings: pd.DataFrame,
     poi_catalog: PoiCatalog,
-    *,
-    save_path: Path | None = None,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     base_features = build_base_features(listings)
     poi_features = build_poi_features(listings, poi_catalog)
@@ -63,11 +62,19 @@ def build_processed_dataset(
         numeric_features=[*BASE_NUMERIC_FEATURES, *poi_feature_columns],
         categorical_features=list(CATEGORICAL_FEATURES),
     )
+    features = pd.concat([base_features, poi_features], axis=1)
+    return features[schema.feature_columns].copy(), schema
 
-    processed = pd.concat([listings[METADATA_COLUMNS], base_features, poi_features], axis=1)
-    processed = processed[
-        [*METADATA_COLUMNS, *BASE_NUMERIC_FEATURES, *CATEGORICAL_FEATURES, *poi_feature_columns]
-    ].copy()
+
+def build_processed_dataset(
+    listings: pd.DataFrame,
+    poi_catalog: PoiCatalog,
+    *,
+    save_path: Path | None = None,
+) -> tuple[pd.DataFrame, FeatureSchema]:
+    features, schema = build_feature_frame(listings, poi_catalog)
+    processed = pd.concat([listings[METADATA_COLUMNS], features], axis=1)
+    processed = processed[[*METADATA_COLUMNS, *schema.feature_columns]].copy()
 
     if save_path is not None:
         save_path.parent.mkdir(parents=True, exist_ok=True)

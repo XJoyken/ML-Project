@@ -1,13 +1,15 @@
 from .constants import ARTIFACTS_DIR, PROCESSED_DATASET_PATH
-from .data import PoiCatalog, get_listing_input, load_listings, load_poi_catalog, normalize_listing_frame
+from .data import get_listing_input, load_listings, normalize_listing_frame
 from .features import (
     FeatureSchema,
     build_base_features,
+    build_feature_frame,
     build_inference_frame,
     build_poi_features,
     build_processed_dataset,
 )
 from .models import CatBoostPriceModel, create_model, load_model
+from .poi import PoiCatalog, load_poi_catalog
 from .predict import build_explanation, get_verdict, predict_price
 from .train import evaluate_model, load_schema, save_artifacts, train_model
 
@@ -17,6 +19,7 @@ __all__ = [
     "create_model",
     "FeatureSchema",
     "build_base_features",
+    "build_feature_frame",
     "build_explanation",
     "build_inference_frame",
     "build_poi_features",

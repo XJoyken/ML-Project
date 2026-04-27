@@ -8,10 +8,11 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from .constants import ARTIFACTS_DIR, POI_SOURCE_FILES, PROCESSED_DATASET_PATH, TARGET_COLUMN
-from .data import load_listings, load_poi_catalog
+from .data import load_listings
 from .features import FeatureSchema, build_processed_dataset
 from .metrics import calculate_metrics
 from .models import create_model
+from .poi import load_poi_catalog
 
 
 def train_model(
