@@ -16,7 +16,7 @@ from .data import get_listing_input, load_listings
 from .features import build_inference_frame
 from .models import load_model
 from .poi import load_poi_catalog
-from .train import artifact_dir, load_schema, schema_path
+from .train import artifact_dir, load_schema
 
 
 def predict_price(
@@ -33,29 +33,19 @@ def predict_price(
 
     if listing_id is not None:
         listing_payload = get_listing_input(listing_id, listings=reference_ads)
-    elif listing is not None:
-        listing_payload = dict(listing)
     else:
-        raise ValueError("Pass either listing_id or listing.")
+        listing_payload = dict(listing)
 
-    processed, fallback_schema = build_inference_frame(
+    processed, _ = build_inference_frame(
         listing_payload,
         reference_ads=reference_ads,
         poi_catalog=poi_catalog,
     )
-    schema = (
-        load_schema(model_name, artifact_root=artifact_root)
-        if schema_path(model_name, artifact_root=artifact_root).exists()
-        else fallback_schema
-    )
+    schema = load_schema(model_name, artifact_root=artifact_root)
     model = load_model(model_name, artifact_dir(model_name, artifact_root=artifact_root))
     predicted_price = float(model.predict(processed, schema)[0])
     listing_price = float(processed.iloc[0][schema.target_column])
-    delta_percent = (
-        ((predicted_price - listing_price) / predicted_price) * 100.0
-        if predicted_price
-        else 0.0
-    )
+    delta_percent = ((predicted_price - listing_price) / predicted_price) * 100.0
     verdict = get_verdict(listing_price, predicted_price)
     nearby_pois = poi_catalog.nearest_many(
         lat=float(processed.iloc[0]["lat"]),

@@ -23,7 +23,7 @@ RADIUS_COUNT_METERS = (500, 1000)
 
 
 class PoiCatalog:
-    def __init__(self, frames: dict[str, pd.DataFrame]) -> None:
+    def __init__(self, frames: dict[str, pd.DataFrame]):
         self.frames = frames
         self.trees: dict[str, BallTree] = {}
 
@@ -114,21 +114,12 @@ class PoiCatalog:
 def load_poi_catalog(
     poi_sources: dict[str, Path] | None = None,
 ) -> PoiCatalog:
-    frames: dict[str, pd.DataFrame] = {}
-
-    for category, path in (poi_sources or POI_SOURCE_FILES).items():
-        if not path.exists():
-            continue
-
-        frame = pd.read_csv(path)
-        if frame.empty:
-            continue
-
-        normalized = normalize_poi_frame(frame)
-        if not normalized.empty:
-            frames[category] = normalized
-
-    return PoiCatalog(frames)
+    return PoiCatalog(
+        {
+            category: normalize_poi_frame(pd.read_csv(path))
+            for category, path in (poi_sources or POI_SOURCE_FILES).items()
+        }
+    )
 
 
 def normalize_poi_frame(frame: pd.DataFrame) -> pd.DataFrame:

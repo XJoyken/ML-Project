@@ -98,8 +98,6 @@ def get_listing_input(
 ) -> dict[str, Any]:
     listings = load_listings(ads_path=ads_path) if listings is None else listings
     matched = listings.loc[listings["listing_id"].astype("string").eq(str(listing_id))]
-    if matched.empty:
-        raise KeyError(f"Listing with id '{listing_id}' was not found.")
     return matched.iloc[0].to_dict()
 
 
@@ -125,12 +123,12 @@ def normalize_listing_frame(
     return canonical.reset_index(drop=True)
 
 
-def coerce_numeric_columns(frame: pd.DataFrame, columns: list[str]) -> None:
+def coerce_numeric_columns(frame: pd.DataFrame, columns: list[str]):
     for column in columns:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
 
 
-def normalize_ceiling_height(frame: pd.DataFrame) -> None:
+def normalize_ceiling_height(frame: pd.DataFrame):
     if frame["ceiling_height_m"].isna().all():
         frame["ceiling_height_m"] = extract_numeric(frame["ceiling_height_text"])
         return
@@ -141,7 +139,7 @@ def normalize_ceiling_height(frame: pd.DataFrame) -> None:
     )
 
 
-def normalize_floor_columns(frame: pd.DataFrame) -> None:
+def normalize_floor_columns(frame: pd.DataFrame):
     if frame[["floor_current", "floors_total"]].isna().all(axis=None):
         frame[["floor_current", "floors_total"]] = parse_floor_columns(frame["floor_text"])
         return
@@ -149,7 +147,7 @@ def normalize_floor_columns(frame: pd.DataFrame) -> None:
     coerce_numeric_columns(frame, ["floor_current", "floors_total"])
 
 
-def normalize_datetime_columns(frame: pd.DataFrame) -> None:
+def normalize_datetime_columns(frame: pd.DataFrame):
     for column in DATETIME_COLUMNS:
         frame[column] = pd.to_datetime(
             frame[column],
@@ -158,7 +156,7 @@ def normalize_datetime_columns(frame: pd.DataFrame) -> None:
         ).dt.tz_convert(None)
 
 
-def add_days_since_added_to_scrape(frame: pd.DataFrame) -> None:
+def add_days_since_added_to_scrape(frame: pd.DataFrame):
     column = "days_since_added_to_scrape"
     if frame[column].isna().all():
         frame[column] = (frame["scraped_at"] - frame["listing_added_at"]).dt.days
@@ -166,7 +164,7 @@ def add_days_since_added_to_scrape(frame: pd.DataFrame) -> None:
     frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
 
 
-def normalize_photo_features(frame: pd.DataFrame) -> None:
+def normalize_photo_features(frame: pd.DataFrame):
     has_photo = frame["has_photo"]
     if has_photo.dtype == "object" or str(has_photo.dtype).startswith("string"):
         has_photo = binary_from_text(has_photo)
@@ -176,7 +174,7 @@ def normalize_photo_features(frame: pd.DataFrame) -> None:
     ).astype(float)
 
 
-def add_presence_flags(frame: pd.DataFrame) -> None:
+def add_presence_flags(frame: pd.DataFrame):
     frame["has_complex_id"] = frame["complex_id"].notna().astype(np.int8)
     frame["has_microdistrict"] = frame["microdistrict"].notna().astype(np.int8)
 
@@ -186,7 +184,7 @@ def add_complex_listing_count(
     *,
     reference_ads: pd.DataFrame | None,
     fit_mode: bool,
-) -> None:
+):
     source = frame if fit_mode or reference_ads is None else reference_ads
     complex_counts = source["complex_id"].value_counts(dropna=True).to_dict()
     frame["complex_listing_count"] = (
@@ -194,12 +192,12 @@ def add_complex_listing_count(
     )
 
 
-def fill_categorical_features(frame: pd.DataFrame) -> None:
+def fill_categorical_features(frame: pd.DataFrame):
     for column in CATEGORICAL_FEATURES:
         frame[column] = frame[column].fillna("unknown").astype("string")
 
 
-def validate_inference_frame(frame: pd.DataFrame) -> None:
+def validate_inference_frame(frame: pd.DataFrame):
     required = {
         "area_m2": "area_m2",
         "rooms": "rooms",
@@ -250,7 +248,7 @@ def binary_from_text(series: pd.Series) -> pd.Series:
     )
 
 
-def ensure_columns(frame: pd.DataFrame, columns: list[str]) -> None:
+def ensure_columns(frame: pd.DataFrame, columns: list[str]):
     for column in columns:
         if column not in frame.columns:
             frame[column] = pd.NA

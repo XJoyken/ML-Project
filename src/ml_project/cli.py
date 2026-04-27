@@ -86,7 +86,4 @@ def _load_payload(value: str) -> str:
 
 def _parse_csv_payload(payload: str) -> dict[str, str]:
     reader = csv.DictReader(io.StringIO(payload))
-    row = next(reader, None)
-    if row is None:
-        raise ValueError("CSV payload must contain a header and a single row.")
-    return row
+    return next(reader)
