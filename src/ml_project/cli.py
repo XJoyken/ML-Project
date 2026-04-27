@@ -14,7 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Almaty apartment pricing pipeline.")
     subparsers = parser.add_subparsers(dest="command")
 
-    train_parser = subparsers.add_parser("train", help="Train and persist a model.")
+    train_parser = subparsers.add_parser("train", help="Train a model.")
     train_parser.add_argument("--model", default="catboost")
     train_parser.add_argument("--test-size", type=float, default=0.2)
     train_parser.add_argument("--random-state", type=int, default=42)
@@ -45,8 +45,6 @@ def main(argv: list[str] | None = None) -> int:
             random_state=args.random_state if args.command else 42,
         )
         print(f"Processed rows: {len(result['processed_frame']):,}")
-        if result["artifact_dir"] is not None:
-            print(f"Artifact dir: {result['artifact_dir']}")
         print(result["metrics_frame"].round(4).to_string(index=False))
         return 0
 

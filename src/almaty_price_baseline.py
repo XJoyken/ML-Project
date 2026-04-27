@@ -17,7 +17,6 @@ def run_pipeline(
         test_size=test_size,
         random_state=random_state,
         save_processed=True,
-        persist_artifacts=True,
     )
     return result["processed_frame"], result["metrics_frame"], result["model"]
 

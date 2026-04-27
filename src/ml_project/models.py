@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
@@ -40,22 +37,6 @@ class CatBoostPriceModel:
     def predict(self, frame: pd.DataFrame, schema) -> np.ndarray:
         return np.expm1(self.model.predict(frame[schema.feature_columns]))
 
-    def save(self, artifact_dir: Path):
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        self.model.save_model(str(artifact_dir / "model.cbm"))
-        (artifact_dir / "params.json").write_text(
-            json.dumps(self.params, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-
-    @classmethod
-    def load(cls, artifact_dir: Path) -> "CatBoostPriceModel":
-        params_path = artifact_dir / "params.json"
-        params = json.loads(params_path.read_text(encoding="utf-8"))
-        model = cls(**params)
-        model.model.load_model(str(artifact_dir / "model.cbm"))
-        return model
-
 
 MODEL_CLASSES = {CatBoostPriceModel.model_name: CatBoostPriceModel}
 
@@ -64,12 +45,7 @@ def create_model(model_name: str, **params: object):
     return MODEL_CLASSES[model_name](**params)
 
 
-def load_model(model_name: str, artifact_dir: Path):
-    return MODEL_CLASSES[model_name].load(artifact_dir)
-
-
 __all__ = [
     "CatBoostPriceModel",
     "create_model",
-    "load_model",
 ]

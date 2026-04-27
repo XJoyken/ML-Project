@@ -7,7 +7,6 @@ EARTH_RADIUS_KM = 6_371.0088
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "datasets"
 PROCESSED_DIR = DATA_DIR / "processed"
-ARTIFACTS_DIR = ROOT_DIR / "artifacts"
 PROCESSED_DATASET_PATH = PROCESSED_DIR / "ads_model_v1.csv"
 DEFAULT_MODEL_NAME = "catboost"
 

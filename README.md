@@ -6,10 +6,9 @@ Ml project is related to determining the pricing of apartments in Almaty and det
 - `src/ml_project/poi.py`: loading POI csv files, spatial index, and POI distance/count features.
 - `src/ml_project/features.py`: feature schema, base listing features, POI features, processed dataset builders.
 - `src/ml_project/models.py`: model implementations and model factory.
-- `src/ml_project/train.py`: train/evaluate functions and artifact saving.
+- `src/ml_project/train.py`: train/evaluate functions.
 - `src/ml_project/predict.py`: prediction, verdict, and human-readable explanation.
 - `src/almaty_price_baseline.py`: thin wrapper and CLI entrypoint.
-- `artifacts/<model_name>`: trained model files, schema, and metrics.
 
 ## CLI
 Activate the project virtualenv first:
@@ -34,5 +33,3 @@ src/almaty_price_baseline.py predict --model catboost --input-json '{"lat":43.2,
 
 Available models:
 - `catboost`
-
-`datasets/processed/ads_model_v1.csv` is kept as an optional debug dataset. Trained models are stored under `artifacts/`.

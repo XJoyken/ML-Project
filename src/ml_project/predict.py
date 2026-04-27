@@ -4,19 +4,15 @@ from pathlib import Path
 from typing import Any
 
 from .constants import (
-    ARTIFACTS_DIR,
     DEFAULT_EXPLANATION_CATEGORIES,
     EXPLANATION_RADIUS_M,
     POI_CATEGORY_LABELS,
-    POI_SOURCE_FILES,
     VERDICT_OVERPRICED_THRESHOLD,
     VERDICT_UNDERVALUED_THRESHOLD,
 )
-from .data import get_listing_input, load_listings
+from .data import get_listing_input
 from .features import build_inference_frame
-from .models import load_model
-from .poi import load_poi_catalog
-from .train import artifact_dir, load_schema
+from .train import train_model
 
 
 def predict_price(
@@ -26,10 +22,16 @@ def predict_price(
     listing: dict[str, Any] | None = None,
     ads_path: Path | None = None,
     poi_sources: dict[str, Path] | None = None,
-    artifact_root: Path | None = ARTIFACTS_DIR,
 ) -> dict[str, Any]:
-    reference_ads = load_listings(ads_path=ads_path)
-    poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
+    training = train_model(
+        model_name,
+        ads_path=ads_path,
+        poi_sources=poi_sources,
+        processed_path=None,
+        save_processed=False,
+    )
+    reference_ads = training["listings"]
+    poi_catalog = training["poi_catalog"]
 
     if listing_id is not None:
         listing_payload = get_listing_input(listing_id, listings=reference_ads)
@@ -41,8 +43,8 @@ def predict_price(
         reference_ads=reference_ads,
         poi_catalog=poi_catalog,
     )
-    schema = load_schema(model_name, artifact_root=artifact_root)
-    model = load_model(model_name, artifact_dir(model_name, artifact_root=artifact_root))
+    schema = training["schema"]
+    model = training["model"]
     predicted_price = float(model.predict(processed, schema)[0])
     listing_price = float(processed.iloc[0][schema.target_column])
     delta_percent = ((predicted_price - listing_price) / predicted_price) * 100.0
