@@ -57,7 +57,6 @@ NORMALIZED_LISTING_COLUMNS = [
     "photo_count",
     "scraped_at",
     "listing_added_at",
-    "days_since_added_to_scrape",
 ]
 
 NUMERIC_LISTING_COLUMNS = [
@@ -69,9 +68,6 @@ NUMERIC_LISTING_COLUMNS = [
     "photo_count",
     "year_built",
 ]
-
-DATETIME_COLUMNS = ("scraped_at", "listing_added_at")
-
 
 def load_listings(ads_path: Path | None = None) -> pd.DataFrame:
     ads_path = ads_path or (DATA_DIR / "ads.csv")
@@ -112,8 +108,6 @@ def normalize_listing_frame(
     coerce_numeric_columns(canonical, NUMERIC_LISTING_COLUMNS)
     normalize_ceiling_height(canonical)
     normalize_floor_columns(canonical)
-    normalize_datetime_columns(canonical)
-    add_days_since_added_to_scrape(canonical)
     normalize_photo_features(canonical)
     add_presence_flags(canonical)
     add_complex_listing_count(canonical, reference_ads=reference_ads, fit_mode=fit_mode)
@@ -145,23 +139,6 @@ def normalize_floor_columns(frame: pd.DataFrame):
         return
 
     coerce_numeric_columns(frame, ["floor_current", "floors_total"])
-
-
-def normalize_datetime_columns(frame: pd.DataFrame):
-    for column in DATETIME_COLUMNS:
-        frame[column] = pd.to_datetime(
-            frame[column],
-            errors="coerce",
-            utc=True,
-        ).dt.tz_convert(None)
-
-
-def add_days_since_added_to_scrape(frame: pd.DataFrame):
-    column = "days_since_added_to_scrape"
-    if frame[column].isna().all():
-        frame[column] = (frame["scraped_at"] - frame["listing_added_at"]).dt.days
-
-    frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
 
 
 def normalize_photo_features(frame: pd.DataFrame):

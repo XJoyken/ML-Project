@@ -33,7 +33,6 @@
     "has_complex_id",
     "has_microdistrict",
     "complex_listing_count",
-    "days_since_added_to_scrape",
     "clinics_count_1000m",
     "clinics_count_500m",
     "clinics_dist_km_1",

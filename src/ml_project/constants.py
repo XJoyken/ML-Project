@@ -72,7 +72,6 @@ BASE_NUMERIC_FEATURES = [
     "has_complex_id",
     "has_microdistrict",
     "complex_listing_count",
-    "days_since_added_to_scrape",
 ]
 
 METADATA_COLUMNS = [
