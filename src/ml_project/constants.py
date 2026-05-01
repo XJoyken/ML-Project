@@ -44,12 +44,9 @@ ADS_COLUMNS = [
     "summary_Санузел",
     "listing_has_photo",
     "listing_photo_count",
-    "scraped_at",
-    "listing_added_at",
 ]
 
 TARGET_COLUMN = "target_price_kzt"
-TARGET_LOG_COLUMN = "target_log_price"
 
 CATEGORICAL_FEATURES = [
     "district",
@@ -72,14 +69,6 @@ BASE_NUMERIC_FEATURES = [
     "has_complex_id",
     "has_microdistrict",
     "complex_listing_count",
-]
-
-METADATA_COLUMNS = [
-    "listing_id",
-    TARGET_COLUMN,
-    TARGET_LOG_COLUMN,
-    "scraped_at",
-    "listing_added_at",
 ]
 
 DEFAULT_EXPLANATION_CATEGORIES = ("schools", "universities")

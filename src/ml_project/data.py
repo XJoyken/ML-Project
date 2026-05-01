@@ -11,7 +11,6 @@ from .constants import (
     CATEGORICAL_FEATURES,
     DATA_DIR,
     TARGET_COLUMN,
-    TARGET_LOG_COLUMN,
 )
 from .poi import PoiCatalog, load_poi_catalog
 
@@ -55,8 +54,6 @@ NORMALIZED_LISTING_COLUMNS = [
     "bathroom_type",
     "has_photo",
     "photo_count",
-    "scraped_at",
-    "listing_added_at",
 ]
 
 NUMERIC_LISTING_COLUMNS = [
@@ -113,7 +110,6 @@ def normalize_listing_frame(
     add_complex_listing_count(canonical, reference_ads=reference_ads, fit_mode=fit_mode)
     fill_categorical_features(canonical)
 
-    canonical[TARGET_LOG_COLUMN] = np.log1p(canonical[TARGET_COLUMN])
     return canonical.reset_index(drop=True)
 
 

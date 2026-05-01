@@ -9,9 +9,7 @@ import pandas as pd
 from .constants import (
     BASE_NUMERIC_FEATURES,
     CATEGORICAL_FEATURES,
-    METADATA_COLUMNS,
     TARGET_COLUMN,
-    TARGET_LOG_COLUMN,
 )
 from .data import normalize_listing_frame, validate_inference_frame
 from .poi import PoiCatalog
@@ -33,6 +31,7 @@ class FeatureSchema:
             "numeric_features": self.numeric_features,
             "categorical_features": self.categorical_features,
         }
+
 
 def build_base_features(listings: pd.DataFrame) -> pd.DataFrame:
     return listings[[*BASE_NUMERIC_FEATURES, *CATEGORICAL_FEATURES]].copy()
@@ -64,8 +63,8 @@ def build_processed_dataset(
     save_path: Path | None = None,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     features, schema = build_feature_frame(listings, poi_catalog)
-    processed = pd.concat([listings[METADATA_COLUMNS], features], axis=1)
-    processed = processed[[*METADATA_COLUMNS, *schema.feature_columns]].copy()
+    processed = pd.concat([listings[[schema.target_column]], features], axis=1)
+    processed = processed[[schema.target_column, *schema.feature_columns]].copy()
 
     if save_path is not None:
         save_path.parent.mkdir(parents=True, exist_ok=True)
