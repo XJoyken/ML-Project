@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import mlflow
-import mlflow.catboost
 import pandas as pd
 
 from .features import FeatureSchema
+from .models import load_mlflow_model
 
 
 def log_training_run(
@@ -41,11 +43,7 @@ def log_training_run(
         log_dataset(train_frame, name="processed_train", context="training")
         log_dataset(valid_frame, name="processed_validation", context="validation")
         mlflow.log_dict(schema.to_dict(), "schema.json")
-        mlflow.catboost.log_model(
-            model.model,
-            name="model",
-            metadata=run_metadata(schema),
-        )
+        model.log_to_mlflow(name="model", metadata=run_metadata(schema))
 
 
 def log_dataset(frame: pd.DataFrame, *, name: str, context: str):
@@ -59,3 +57,32 @@ def run_metadata(schema: FeatureSchema) -> dict[str, Any]:
         "numeric_features": schema.numeric_features,
         "categorical_features": schema.categorical_features,
     }
+
+
+def load_latest_model(experiment_name: str, model_name: str):
+    client = mlflow.tracking.MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        raise FileNotFoundError(
+            f"MLflow experiment '{experiment_name}' not found. Run train first."
+        )
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"params.model = '{model_name}'",
+        order_by=["start_time DESC"],
+        max_results=1,
+    )
+    if not runs:
+        raise FileNotFoundError(
+            f"No runs with model='{model_name}' in experiment '{experiment_name}'."
+        )
+    run = runs[0]
+    model = load_mlflow_model(model_name, f"runs:/{run.info.run_id}/model")
+    schema_path = Path(client.download_artifacts(run.info.run_id, "schema.json"))
+    schema_dict = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema = FeatureSchema(
+        numeric_features=list(schema_dict["numeric_features"]),
+        categorical_features=list(schema_dict["categorical_features"]),
+        target_column=schema_dict["target_column"],
+    )
+    return run, model, schema

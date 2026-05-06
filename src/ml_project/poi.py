@@ -19,7 +19,7 @@ POI_ADDRESS_COLUMNS = ("address", "listing_address_text")
 
 NEAREST_POI_COUNT = 5
 MEAN_DISTANCE_COUNTS = (3, 5)
-RADIUS_COUNT_METERS = (500, 1000)
+RADIUS_COUNT_METERS = (300, 500, 1000)
 
 
 class PoiCatalog:
@@ -70,6 +70,8 @@ class PoiCatalog:
                     "distance_m": float(distances[0, 0] * EARTH_RADIUS_KM * 1000),
                     "lat": float(matched["lat"]),
                     "lon": float(matched["lon"]),
+                    "rating": optional_float(matched.get("rating")),
+                    "reviews_count": optional_int(matched.get("reviews_count")),
                 }
             )
 
@@ -87,7 +89,7 @@ class PoiCatalog:
         distances_km = query_distances_km(tree, coordinates_rad, neighbor_count)
 
         features = pd.DataFrame(index=index)
-        features[f"{category}_dist_km_1"] = distances_km[:, 0].astype(np.float32)
+        features[f"{category}_nearest_dist_m"] = (distances_km[:, 0] * 1000).astype(np.float32)
 
         for count in MEAN_DISTANCE_COUNTS:
             mean_distances = distances_km[:, : min(count, neighbor_count)].mean(axis=1)
@@ -134,6 +136,8 @@ def normalize_poi_frame(frame: pd.DataFrame) -> pd.DataFrame:
             "address": text_or_empty(frame, address_column),
             "lat": pd.to_numeric(frame.get("lat"), errors="coerce"),
             "lon": pd.to_numeric(frame.get("lon"), errors="coerce"),
+            "rating": pd.to_numeric(frame.get("rating"), errors="coerce"),
+            "reviews_count": pd.to_numeric(frame.get("reviews_count"), errors="coerce"),
         }
     ).dropna(subset=["poi_id", "name", "lat", "lon"])
 
@@ -183,3 +187,15 @@ def optional_str(value: Any) -> str | None:
     if value is None or pd.isna(value):
         return None
     return str(value)
+
+
+def optional_float(value: Any) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
+
+
+def optional_int(value: Any) -> int | None:
+    if value is None or pd.isna(value):
+        return None
+    return int(value)

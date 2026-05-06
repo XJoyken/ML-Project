@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from .air import AIR_FEATURE_COLUMNS, AirQualityCatalog
 from .constants import (
     BASE_NUMERIC_FEATURES,
     CATEGORICAL_FEATURES,
@@ -41,28 +42,38 @@ def build_poi_features(listings: pd.DataFrame, poi_catalog: PoiCatalog) -> pd.Da
     return poi_catalog.build_feature_frame(listings)
 
 
+def build_air_features(
+    listings: pd.DataFrame,
+    air_catalog: AirQualityCatalog,
+) -> pd.DataFrame:
+    return air_catalog.build_feature_frame(listings)
+
+
 def build_feature_frame(
     listings: pd.DataFrame,
     poi_catalog: PoiCatalog,
+    air_catalog: AirQualityCatalog,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     base_features = build_base_features(listings)
     poi_features = build_poi_features(listings, poi_catalog)
+    air_features = build_air_features(listings, air_catalog)
     poi_feature_columns = sorted(poi_features.columns.tolist())
     schema = FeatureSchema(
-        numeric_features=[*BASE_NUMERIC_FEATURES, *poi_feature_columns],
+        numeric_features=[*BASE_NUMERIC_FEATURES, *poi_feature_columns, *AIR_FEATURE_COLUMNS],
         categorical_features=list(CATEGORICAL_FEATURES),
     )
-    features = pd.concat([base_features, poi_features], axis=1)
+    features = pd.concat([base_features, poi_features, air_features], axis=1)
     return features[schema.feature_columns].copy(), schema
 
 
 def build_processed_dataset(
     listings: pd.DataFrame,
     poi_catalog: PoiCatalog,
+    air_catalog: AirQualityCatalog,
     *,
     save_path: Path | None = None,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
-    features, schema = build_feature_frame(listings, poi_catalog)
+    features, schema = build_feature_frame(listings, poi_catalog, air_catalog)
     processed = pd.concat([listings[[schema.target_column]], features], axis=1)
     processed = processed[[schema.target_column, *schema.feature_columns]].copy()
 
@@ -78,6 +89,7 @@ def build_inference_frame(
     *,
     reference_ads: pd.DataFrame,
     poi_catalog: PoiCatalog,
+    air_catalog: AirQualityCatalog,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     record = dict(listing)
     if "listing_price_kzt" in record and TARGET_COLUMN not in record:
@@ -89,4 +101,4 @@ def build_inference_frame(
         fit_mode=False,
     )
     validate_inference_frame(normalized)
-    return build_processed_dataset(normalized, poi_catalog, save_path=None)
+    return build_processed_dataset(normalized, poi_catalog, air_catalog, save_path=None)
