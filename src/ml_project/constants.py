@@ -23,7 +23,11 @@ POI_SOURCE_FILES = {
     "polyclinics": DATA_DIR / "almaty_polyclinics.csv",
     "medcenters": DATA_DIR / "almaty_medcenters.csv",
     "energy": DATA_DIR / "almaty_energy.csv",
+    "coffee": DATA_DIR / "almaty_coffee.csv",
 }
+
+AIR_QUALITY_RAW_PATH = DATA_DIR / "air_quality.csv"
+AIR_PM25_MAX_PLAUSIBLE = 500.0
 
 ADS_COLUMNS = [
     "listing_id",
@@ -71,7 +75,20 @@ BASE_NUMERIC_FEATURES = [
     "complex_listing_count",
 ]
 
-DEFAULT_EXPLANATION_CATEGORIES = ("schools", "universities")
+DEFAULT_EXPLANATION_CATEGORIES = (
+    "schools",
+    "universities",
+    "kindergartens",
+    "metro",
+    "transport",
+    "clinics",
+    "dentistry",
+    "hospitals",
+    "polyclinics",
+    "medcenters",
+    "energy",
+    "coffee",
+)
 EXPLANATION_RADIUS_M = 300.0
 
 VERDICT_UNDERVALUED_THRESHOLD = 0.95
@@ -89,4 +106,5 @@ POI_CATEGORY_LABELS = {
     "polyclinics": "поликлиника",
     "medcenters": "медцентр",
     "energy": "энергообъект",
+    "coffee": "кофейня",
 }
