@@ -21,6 +21,12 @@ from .models import create_model
 from .poi import load_poi_catalog
 from .tracking import log_training_run
 
+STRATIFY_BINS = 10
+
+
+def stratify_bins(target: pd.Series, n_bins: int = STRATIFY_BINS) -> pd.Series:
+    return pd.qcut(target, q=n_bins, labels=False, duplicates="drop")
+
 
 def train_model(
     model_name: str = "catboost",
@@ -35,6 +41,7 @@ def train_model(
     save_processed: bool = True,
     log_to_mlflow: bool = True,
     experiment_name: str = MLFLOW_EXPERIMENT_NAME,
+    final: bool = False,
 ) -> dict[str, Any]:
     listings = load_listings(ads_path=ads_path)
     poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
@@ -50,9 +57,14 @@ def train_model(
         processed,
         test_size=test_size,
         random_state=random_state,
+        stratify=stratify_bins(processed[TARGET_COLUMN]),
     )
     model = create_model(model_name, **(model_params or {}))
     model.fit(train_frame, schema)
+    if final:
+        best_iter = model.best_iteration()
+        print(f"Pass 1 finished, best_iteration={best_iter}. Refitting on full train without ES.")
+        model.refit_no_es(train_frame, schema)
     predictions = model.predict(valid_frame, schema)
 
     metrics_frame = pd.DataFrame(
@@ -99,6 +111,7 @@ def evaluate_model(
     test_size: float = 0.2,
     random_state: int = 42,
     model_params: dict[str, object] | None = None,
+    final: bool = False,
 ) -> dict[str, Any]:
     return train_model(
         model_name,
@@ -111,4 +124,5 @@ def evaluate_model(
         model_params=model_params,
         save_processed=False,
         log_to_mlflow=False,
+        final=final,
     )
