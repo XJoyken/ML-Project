@@ -1,0 +1,14 @@
+{
+  "lat": 43.235,
+  "lon": 76.917,
+  "area_m2": 55.5,
+  "rooms": 2,
+  "district": "Бостандыкский район",
+  "house_type": "монолитный",
+  "condition": "свежий ремонт",
+  "bathroom_type": "совмещенный",
+  "year_built": 2020,
+  "floor_current": 5,
+  "floors_total": 12,
+  "listing_price_kzt": 42000000
+}

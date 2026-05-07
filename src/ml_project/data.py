@@ -8,9 +8,20 @@ import pandas as pd
 
 from .constants import (
     ADS_COLUMNS,
+    ALMATY_CENTER_LAT,
+    ALMATY_CENTER_LON,
+    AREA_M2_MAX,
+    AREA_M2_MIN,
     CATEGORICAL_FEATURES,
     DATA_DIR,
+    EARTH_RADIUS_KM,
+    PRICE_PER_M2_LOWER_QUANTILE,
+    PRICE_PER_M2_UPPER_QUANTILE,
+    REFERENCE_YEAR,
+    ROOMS_MAX,
     TARGET_COLUMN,
+    YEAR_BUILT_MAX,
+    YEAR_BUILT_MIN,
 )
 from .poi import PoiCatalog, load_poi_catalog
 
@@ -73,14 +84,24 @@ def load_listings(ads_path: Path | None = None) -> pd.DataFrame:
     frame = frame.rename(columns=LISTING_COLUMN_MAP)
 
     frame = normalize_listing_frame(frame, fit_mode=True)
-    frame = frame.loc[
+    frame = filter_implausible_listings(frame)
+    return frame.reset_index(drop=True)
+
+
+def filter_implausible_listings(frame: pd.DataFrame) -> pd.DataFrame:
+    price_per_m2 = frame[TARGET_COLUMN] / frame["area_m2"]
+    low = price_per_m2.quantile(PRICE_PER_M2_LOWER_QUANTILE)
+    high = price_per_m2.quantile(PRICE_PER_M2_UPPER_QUANTILE)
+    keep = (
         frame[TARGET_COLUMN].gt(0)
-        & frame["area_m2"].gt(0)
+        & frame["area_m2"].between(AREA_M2_MIN, AREA_M2_MAX)
         & frame["rooms"].notna()
+        & frame["rooms"].le(ROOMS_MAX)
         & frame["lat"].between(43.0, 44.0)
         & frame["lon"].between(76.0, 77.2)
-    ].copy()
-    return frame.reset_index(drop=True)
+        & price_per_m2.between(low, high)
+    )
+    return frame.loc[keep].copy()
 
 
 def get_listing_input(
@@ -103,14 +124,49 @@ def normalize_listing_frame(
     canonical = frame.copy()
     ensure_columns(canonical, NORMALIZED_LISTING_COLUMNS)
     coerce_numeric_columns(canonical, NUMERIC_LISTING_COLUMNS)
+    clean_implausible_year_built(canonical)
     normalize_ceiling_height(canonical)
     normalize_floor_columns(canonical)
     normalize_photo_features(canonical)
     add_presence_flags(canonical)
     add_complex_listing_count(canonical, reference_ads=reference_ads, fit_mode=fit_mode)
+    add_derived_features(canonical)
     fill_categorical_features(canonical)
 
     return canonical.reset_index(drop=True)
+
+
+def clean_implausible_year_built(frame: pd.DataFrame):
+    invalid = (frame["year_built"] < YEAR_BUILT_MIN) | (frame["year_built"] > YEAR_BUILT_MAX)
+    frame.loc[invalid, "year_built"] = np.nan
+
+
+def add_derived_features(frame: pd.DataFrame):
+    frame["floor_ratio"] = (frame["floor_current"] / frame["floors_total"]).astype("float32")
+    frame["building_age"] = (REFERENCE_YEAR - frame["year_built"]).astype("float32")
+    frame["area_per_room"] = (frame["area_m2"] / frame["rooms"]).astype("float32")
+    frame["is_first_floor"] = frame["floor_current"].eq(1).fillna(False).astype(np.int8)
+    is_last = (
+        frame["floor_current"].eq(frame["floors_total"])
+        & frame["floors_total"].notna()
+        & frame["floor_current"].notna()
+    )
+    frame["is_last_floor"] = is_last.fillna(False).astype(np.int8)
+    frame["dist_to_center_km"] = haversine_km(
+        frame["lat"].to_numpy(),
+        frame["lon"].to_numpy(),
+        ALMATY_CENTER_LAT,
+        ALMATY_CENTER_LON,
+    ).astype("float32")
+
+
+def haversine_km(lat1, lon1, lat2, lon2) -> np.ndarray:
+    lat1_rad = np.radians(lat1)
+    lat2_rad = np.radians(lat2)
+    dlat = lat2_rad - lat1_rad
+    dlon = np.radians(lon2 - lon1)
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2) ** 2
+    return EARTH_RADIUS_KM * 2 * np.arcsin(np.sqrt(a))
 
 
 def coerce_numeric_columns(frame: pd.DataFrame, columns: list[str]):

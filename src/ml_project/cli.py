@@ -28,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--params",
         help="Model hyperparameters as JSON (string or path to .json file).",
     )
+    train_parser.add_argument(
+        "--final",
+        action="store_true",
+        help="Two-pass: ES finds best_iter, then refit on full train without ES.",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a model.")
     evaluate_parser.add_argument("--model", default="catboost", choices=model_choices)
@@ -36,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument(
         "--params",
         help="Model hyperparameters as JSON (string or path to .json file).",
+    )
+    evaluate_parser.add_argument(
+        "--final",
+        action="store_true",
+        help="Two-pass: ES finds best_iter, then refit on full train without ES.",
     )
 
     predict_parser = subparsers.add_parser("predict", help="Predict fair price and explanation.")
@@ -59,9 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
     source_group.add_argument("--input-json")
     source_group.add_argument("--input-csv")
 
-    tune_parser = subparsers.add_parser("tune", help="Random-search hyperparameters via MLflow.")
+    tune_parser = subparsers.add_parser("tune", help="Hyperparameter search (random or nested-CV).")
     tune_parser.add_argument("--model", required=True, choices=model_choices)
+    tune_parser.add_argument("--mode", default="random", choices=["random", "nested"])
     tune_parser.add_argument("--trials", type=int, default=15)
+    tune_parser.add_argument("--outer-splits", type=int, default=5)
+    tune_parser.add_argument("--inner-splits", type=int, default=3)
     tune_parser.add_argument("--seed", type=int, default=42)
 
     return parser
@@ -82,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             random_state=args.random_state if args.command else 42,
             experiment_name=experiment_name,
             model_params=model_params,
+            final=getattr(args, "final", False),
         )
         print(f"Processed rows: {len(result['processed_frame']):,}")
         print(f"MLflow experiment: {experiment_name}")
@@ -94,15 +108,30 @@ def main(argv: list[str] | None = None) -> int:
             test_size=args.test_size,
             random_state=args.random_state,
             model_params=_load_model_params(args.params),
+            final=args.final,
         )
         print(result["metrics_frame"].round(4).to_string(index=False))
         return 0
 
     if args.command == "tune":
-        history = tune_model(args.model, trials=args.trials, seed=args.seed)
+        history = tune_model(
+            args.model,
+            mode=args.mode,
+            trials=args.trials,
+            outer_splits=args.outer_splits,
+            inner_splits=args.inner_splits,
+            seed=args.seed,
+        )
         print()
-        print("Top 5 by MAE:")
-        print(history.head(5).round(4).to_string(index=False))
+        if args.mode == "random":
+            print("Top 5 by MAE:")
+            print(history.head(5).round(4).to_string(index=False))
+        else:
+            print("Per outer fold:")
+            print(history.round(4).to_string(index=False))
+            print()
+            for key in ["outer_mae_kzt", "outer_mape", "outer_r2"]:
+                print(f"{key}: mean={history[key].mean():.4f}, std={history[key].std():.4f}")
         return 0
 
     if args.command == "predict":

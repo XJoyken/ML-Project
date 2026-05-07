@@ -73,7 +73,24 @@ BASE_NUMERIC_FEATURES = [
     "has_complex_id",
     "has_microdistrict",
     "complex_listing_count",
+    "floor_ratio",
+    "building_age",
+    "area_per_room",
+    "is_first_floor",
+    "is_last_floor",
+    "dist_to_center_km",
 ]
+
+ALMATY_CENTER_LAT = 43.255
+ALMATY_CENTER_LON = 76.935
+REFERENCE_YEAR = 2026
+PRICE_PER_M2_LOWER_QUANTILE = 0.005
+PRICE_PER_M2_UPPER_QUANTILE = 0.995
+AREA_M2_MIN = 15.0
+AREA_M2_MAX = 500.0
+ROOMS_MAX = 8
+YEAR_BUILT_MIN = 1900
+YEAR_BUILT_MAX = 2027
 
 DEFAULT_EXPLANATION_CATEGORIES = (
     "schools",
