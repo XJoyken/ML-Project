@@ -1,0 +1,7 @@
+{
+  "n_estimators": 1500,
+  "learning_rate": 0.03,
+  "num_leaves": 255,
+  "min_child_samples": 20,
+  "reg_lambda": 15.0
+}
