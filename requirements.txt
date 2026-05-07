@@ -5,3 +5,5 @@ catboost
 lightgbm
 xgboost
 mlflow
+matplotlib
+seaborn
