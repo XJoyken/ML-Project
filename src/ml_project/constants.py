@@ -23,7 +23,7 @@ POI_SOURCE_FILES = {
     "polyclinics": DATA_DIR / "almaty_polyclinics.csv",
     "medcenters": DATA_DIR / "almaty_medcenters.csv",
     "energy": DATA_DIR / "almaty_energy.csv",
-    "coffee": DATA_DIR / "almaty_coffee.csv",
+    "restaurants_coffee": DATA_DIR / "almaty_restaurants_coffee.csv",
 }
 
 AIR_QUALITY_RAW_PATH = DATA_DIR / "air_quality.csv"
@@ -104,7 +104,7 @@ DEFAULT_EXPLANATION_CATEGORIES = (
     "polyclinics",
     "medcenters",
     "energy",
-    "coffee",
+    "restaurants_coffee",
 )
 EXPLANATION_RADIUS_M = 300.0
 
@@ -123,5 +123,5 @@ POI_CATEGORY_LABELS = {
     "polyclinics": "поликлиника",
     "medcenters": "медцентр",
     "energy": "энергообъект",
-    "coffee": "кофейня",
+    "restaurants_coffee": "ресторан кофейня",
 }
