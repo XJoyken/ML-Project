@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from .krisha import parse_krisha_listing_url
 from .recommendation_features import (
     DEFAULT_GEMINI_MODEL,
     ExtractedRecommendationFeatures,
@@ -37,6 +38,16 @@ class RecommendationResponse(BaseModel):
     items: list[dict[str, Any]]
 
 
+class ApartmentEvaluationRequest(BaseModel):
+    url: str = Field(min_length=10, max_length=2000)
+
+
+class ApartmentEvaluationResponse(BaseModel):
+    source_url: str
+    parsed_listing: dict[str, Any]
+    evaluation: dict[str, Any]
+
+
 @lru_cache
 def get_feature_extractor() -> GeminiFeatureExtractor:
     return GeminiFeatureExtractor(
@@ -48,6 +59,12 @@ def get_feature_extractor() -> GeminiFeatureExtractor:
 def get_recommender():
     service_module = import_module("ml_project.recommender.service")
     return service_module.KnnRecommendationService()
+
+
+@lru_cache
+def get_apartment_evaluator():
+    service_module = import_module("ml_project.evaluation")
+    return service_module.ApartmentEvaluationService()
 
 
 @app.get("/health")
@@ -88,4 +105,24 @@ def recommend_listings(
         model=extractor.model,
         features=features,
         items=items,
+    )
+
+
+@app.post("/apartments/evaluate", response_model=ApartmentEvaluationResponse)
+def evaluate_apartment(
+    request: ApartmentEvaluationRequest,
+    evaluator=Depends(get_apartment_evaluator),
+) -> ApartmentEvaluationResponse:
+    try:
+        listing = parse_krisha_listing_url(request.url)
+        evaluation = evaluator.evaluate(listing)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Apartment evaluation failed: {exc}") from exc
+
+    return ApartmentEvaluationResponse(
+        source_url=request.url,
+        parsed_listing=listing,
+        evaluation=evaluation,
     )
