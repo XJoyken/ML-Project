@@ -12,6 +12,7 @@ from .constants import (
     CATEGORICAL_FEATURES,
     TARGET_COLUMN,
 )
+from .crime import CRIME_FEATURE_COLUMNS, CrimeCatalog
 from .data import normalize_listing_frame, validate_inference_frame
 from .poi import PoiCatalog
 
@@ -49,20 +50,34 @@ def build_air_features(
     return air_catalog.build_feature_frame(listings)
 
 
+def build_crime_features(
+    listings: pd.DataFrame,
+    crime_catalog: CrimeCatalog,
+) -> pd.DataFrame:
+    return crime_catalog.build_feature_frame(listings)
+
+
 def build_feature_frame(
     listings: pd.DataFrame,
     poi_catalog: PoiCatalog,
     air_catalog: AirQualityCatalog,
+    crime_catalog: CrimeCatalog,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     base_features = build_base_features(listings)
     poi_features = build_poi_features(listings, poi_catalog)
     air_features = build_air_features(listings, air_catalog)
+    crime_features = build_crime_features(listings, crime_catalog)
     poi_feature_columns = sorted(poi_features.columns.tolist())
     schema = FeatureSchema(
-        numeric_features=[*BASE_NUMERIC_FEATURES, *poi_feature_columns, *AIR_FEATURE_COLUMNS],
+        numeric_features=[
+            *BASE_NUMERIC_FEATURES,
+            *poi_feature_columns,
+            *AIR_FEATURE_COLUMNS,
+            *CRIME_FEATURE_COLUMNS,
+        ],
         categorical_features=list(CATEGORICAL_FEATURES),
     )
-    features = pd.concat([base_features, poi_features, air_features], axis=1)
+    features = pd.concat([base_features, poi_features, air_features, crime_features], axis=1)
     return features[schema.feature_columns].copy(), schema
 
 
@@ -70,10 +85,11 @@ def build_processed_dataset(
     listings: pd.DataFrame,
     poi_catalog: PoiCatalog,
     air_catalog: AirQualityCatalog,
+    crime_catalog: CrimeCatalog,
     *,
     save_path: Path | None = None,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
-    features, schema = build_feature_frame(listings, poi_catalog, air_catalog)
+    features, schema = build_feature_frame(listings, poi_catalog, air_catalog, crime_catalog)
     processed = pd.concat([listings[[schema.target_column]], features], axis=1)
     processed = processed[[schema.target_column, *schema.feature_columns]].copy()
 
@@ -90,6 +106,7 @@ def build_inference_frame(
     reference_ads: pd.DataFrame,
     poi_catalog: PoiCatalog,
     air_catalog: AirQualityCatalog,
+    crime_catalog: CrimeCatalog,
 ) -> tuple[pd.DataFrame, FeatureSchema]:
     record = dict(listing)
     if "listing_price_kzt" in record and TARGET_COLUMN not in record:
@@ -101,4 +118,10 @@ def build_inference_frame(
         fit_mode=False,
     )
     validate_inference_frame(normalized)
-    return build_processed_dataset(normalized, poi_catalog, air_catalog, save_path=None)
+    return build_processed_dataset(
+        normalized,
+        poi_catalog,
+        air_catalog,
+        crime_catalog,
+        save_path=None,
+    )

@@ -120,10 +120,6 @@ def ensure_required_listing_fields(listing: dict[str, Any]):
         "rooms",
         "lat",
         "lon",
-        "district",
-        "house_type",
-        "condition",
-        "bathroom_type",
     )
     missing = [field for field in required_fields if listing.get(field) in (None, "")]
     if missing:

@@ -9,11 +9,13 @@ from sklearn.model_selection import train_test_split
 from .air import load_air_catalog
 from .constants import (
     AIR_QUALITY_RAW_PATH,
+    CRIME_RAW_PATH,
     MLFLOW_EXPERIMENT_NAME,
     POI_SOURCE_FILES,
     PROCESSED_DATASET_PATH,
     TARGET_COLUMN,
 )
+from .crime import load_crime_catalog
 from .data import load_listings
 from .features import build_processed_dataset
 from .metrics import calculate_metrics
@@ -29,11 +31,12 @@ def stratify_bins(target: pd.Series, n_bins: int = STRATIFY_BINS) -> pd.Series:
 
 
 def train_model(
-    model_name: str = "catboost",
+    model_name: str = "lightgbm",
     *,
     ads_path: Path | None = None,
     poi_sources: dict[str, Path] | None = None,
     air_quality_path: Path | None = None,
+    crime_path: Path | None = None,
     processed_path: Path | None = PROCESSED_DATASET_PATH,
     test_size: float = 0.2,
     random_state: int = 42,
@@ -46,10 +49,12 @@ def train_model(
     listings = load_listings(ads_path=ads_path)
     poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
     air_catalog = load_air_catalog(raw_path=air_quality_path or AIR_QUALITY_RAW_PATH)
+    crime_catalog = load_crime_catalog(raw_path=crime_path or CRIME_RAW_PATH)
     processed, schema = build_processed_dataset(
         listings,
         poi_catalog,
         air_catalog,
+        crime_catalog,
         save_path=processed_path if save_processed else None,
     )
 
@@ -95,6 +100,7 @@ def train_model(
         "listings": listings,
         "poi_catalog": poi_catalog,
         "air_catalog": air_catalog,
+        "crime_catalog": crime_catalog,
         "processed_frame": processed,
         "metrics_frame": metrics_frame,
         "model": model,
@@ -103,11 +109,12 @@ def train_model(
 
 
 def evaluate_model(
-    model_name: str = "catboost",
+    model_name: str = "lightgbm",
     *,
     ads_path: Path | None = None,
     poi_sources: dict[str, Path] | None = None,
     air_quality_path: Path | None = None,
+    crime_path: Path | None = None,
     test_size: float = 0.2,
     random_state: int = 42,
     model_params: dict[str, object] | None = None,
@@ -118,6 +125,7 @@ def evaluate_model(
         ads_path=ads_path,
         poi_sources=poi_sources,
         air_quality_path=air_quality_path,
+        crime_path=crime_path,
         processed_path=None,
         test_size=test_size,
         random_state=random_state,

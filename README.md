@@ -21,19 +21,21 @@ source .venv/bin/activate
 Then run commands directly:
 
 ```bash
-src/almaty_price_baseline.py train --model catboost
-src/almaty_price_baseline.py evaluate --model catboost
-src/almaty_price_baseline.py predict --model catboost --listing-id 1009196093
+src/almaty_price_baseline.py train --model lightgbm
+src/almaty_price_baseline.py evaluate --model lightgbm
+src/almaty_price_baseline.py predict --model lightgbm --listing-id 1009196093
 mlflow ui
 ```
 
-Training logs params, metrics, schema, and the CatBoost model to the `almaty-apartment-prices` MLflow experiment.
+Training logs params, metrics, schema, and the LightGBM model to the `almaty-apartment-prices` MLflow experiment.
 
 Predict on a custom listing with inline JSON:
 
 ```bash
-src/almaty_price_baseline.py predict --model catboost --input-json '{"lat":43.2,"lon":76.9,"area_m2":50,"rooms":2,"district":"Бостандыкский район","house_type":"монолитный","condition":"хорошее","bathroom_type":"совмещенный","listing_price_kzt":4000000}'
+src/almaty_price_baseline.py predict --model lightgbm --input-json '{"lat":43.2,"lon":76.9,"area_m2":50,"rooms":2,"district":"Бостандыкский район","house_type":"монолитный","condition":"хорошее","bathroom_type":"совмещенный","listing_price_kzt":4000000}'
 ```
 
 Available models:
+- `lightgbm` (default, served by the API)
 - `catboost`
+- `xgboost`

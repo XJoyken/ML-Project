@@ -15,11 +15,15 @@ from .constants import (
 
 POI_ID_COLUMNS = ("poi_id", "firm_id", "id")
 POI_NAME_COLUMNS = ("name", "org_name")
-POI_ADDRESS_COLUMNS = ("address", "listing_address_text")
+POI_ADDRESS_COLUMNS = ("address", "listing_address_text", "full_name")
 
 NEAREST_POI_COUNT = 5
 MEAN_DISTANCE_COUNTS = (3, 5)
 RADIUS_COUNT_METERS = (300, 500, 1000)
+
+POI_EXTRA_COLUMNS: dict[str, tuple[str, ...]] = {
+    "bus_stops": ("routes_list", "bus_routes_count", "trolleybus_routes_count"),
+}
 
 
 class PoiCatalog:
@@ -61,19 +65,21 @@ class PoiCatalog:
             tree = self._get_tree(category)
             distances, indices = tree.query(coordinates_rad, k=1)
             matched = frame.iloc[int(indices[0, 0])]
-            nearby.append(
-                {
-                    "category": category,
-                    "poi_id": str(matched["poi_id"]),
-                    "name": str(matched["name"]),
-                    "address": optional_str(matched.get("address")),
-                    "distance_m": float(distances[0, 0] * EARTH_RADIUS_KM * 1000),
-                    "lat": float(matched["lat"]),
-                    "lon": float(matched["lon"]),
-                    "rating": optional_float(matched.get("rating")),
-                    "reviews_count": optional_int(matched.get("reviews_count")),
-                }
-            )
+            entry = {
+                "category": category,
+                "poi_id": str(matched["poi_id"]),
+                "name": str(matched["name"]),
+                "address": optional_str(matched.get("address")),
+                "distance_m": float(distances[0, 0] * EARTH_RADIUS_KM * 1000),
+                "lat": float(matched["lat"]),
+                "lon": float(matched["lon"]),
+                "rating": optional_float(matched.get("rating")),
+                "reviews_count": optional_int(matched.get("reviews_count")),
+            }
+            for extra_column in POI_EXTRA_COLUMNS.get(category, ()):
+                if extra_column in matched.index:
+                    entry[extra_column] = optional_str(matched[extra_column])
+            nearby.append(entry)
 
         return nearby
 
@@ -116,31 +122,40 @@ class PoiCatalog:
 def load_poi_catalog(
     poi_sources: dict[str, Path] | None = None,
 ) -> PoiCatalog:
+    sources = poi_sources or POI_SOURCE_FILES
     return PoiCatalog(
         {
-            category: normalize_poi_frame(pd.read_csv(path))
-            for category, path in (poi_sources or POI_SOURCE_FILES).items()
+            category: normalize_poi_frame(
+                pd.read_csv(path),
+                extra_columns=POI_EXTRA_COLUMNS.get(category, ()),
+            )
+            for category, path in sources.items()
         }
     )
 
 
-def normalize_poi_frame(frame: pd.DataFrame) -> pd.DataFrame:
+def normalize_poi_frame(
+    frame: pd.DataFrame,
+    extra_columns: tuple[str, ...] = (),
+) -> pd.DataFrame:
     poi_id_column = first_existing(frame, POI_ID_COLUMNS)
     name_column = first_existing(frame, POI_NAME_COLUMNS)
     address_column = first_existing(frame, POI_ADDRESS_COLUMNS)
 
-    normalized = pd.DataFrame(
-        {
-            "poi_id": text_or_empty(frame, poi_id_column),
-            "name": text_or_empty(frame, name_column),
-            "address": text_or_empty(frame, address_column),
-            "lat": pd.to_numeric(frame.get("lat"), errors="coerce"),
-            "lon": pd.to_numeric(frame.get("lon"), errors="coerce"),
-            "rating": pd.to_numeric(frame.get("rating"), errors="coerce"),
-            "reviews_count": pd.to_numeric(frame.get("reviews_count"), errors="coerce"),
-        }
-    ).dropna(subset=["poi_id", "name", "lat", "lon"])
+    columns: dict[str, pd.Series] = {
+        "poi_id": text_or_empty(frame, poi_id_column),
+        "name": text_or_empty(frame, name_column),
+        "address": text_or_empty(frame, address_column),
+        "lat": pd.to_numeric(frame.get("lat"), errors="coerce"),
+        "lon": pd.to_numeric(frame.get("lon"), errors="coerce"),
+        "rating": pd.to_numeric(frame.get("rating"), errors="coerce"),
+        "reviews_count": pd.to_numeric(frame.get("reviews_count"), errors="coerce"),
+    }
+    for extra in extra_columns:
+        if extra in frame.columns:
+            columns[extra] = frame[extra].astype("string")
 
+    normalized = pd.DataFrame(columns).dropna(subset=["poi_id", "name", "lat", "lon"])
     return normalized.drop_duplicates(subset=["lat", "lon"]).reset_index(drop=True)
 
 

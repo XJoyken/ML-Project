@@ -8,13 +8,15 @@ from .features import (
     build_poi_features,
     build_processed_dataset,
 )
-from .models import CatBoostPriceModel, create_model
+from .models import CatBoostPriceModel, LightGBMPriceModel, XGBoostPriceModel, create_model
 from .poi import PoiCatalog, load_poi_catalog
 from .predict import build_explanation, get_verdict, predict_price
 from .train import evaluate_model, train_model
 
 __all__ = [
     "CatBoostPriceModel",
+    "LightGBMPriceModel",
+    "XGBoostPriceModel",
     "create_model",
     "FeatureSchema",
     "build_base_features",

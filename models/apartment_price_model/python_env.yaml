@@ -1,6 +1,6 @@
-python: 3.13.6
+python: 3.14.3
 build_dependencies:
-- pip==25.2
+- pip==25.3
 - setuptools
 - wheel
 dependencies:

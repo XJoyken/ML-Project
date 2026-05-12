@@ -10,12 +10,13 @@ PROCESSED_DIR = DATA_DIR / "processed"
 PROCESSED_DATASET_PATH = PROCESSED_DIR / "ads_model_v1.csv"
 MODELS_DIR = ROOT_DIR / "models"
 DEFAULT_APARTMENT_MODEL_DIR = MODELS_DIR / "apartment_price_model"
-DEFAULT_MODEL_NAME = "catboost"
+DEFAULT_MODEL_NAME = "lightgbm"
 MLFLOW_EXPERIMENT_NAME = "almaty-apartment-prices"
 
 POI_SOURCE_FILES = {
     "metro": DATA_DIR / "almaty_metro.csv",
     "transport": DATA_DIR / "almaty_transport.csv",
+    "bus_stops": DATA_DIR / "almaty_bus_stops.csv",
     "schools": DATA_DIR / "almaty_schools.csv",
     "kindergartens": DATA_DIR / "almaty_kindergartens.csv",
     "universities": DATA_DIR / "almaty_university_filtered.csv",
@@ -26,10 +27,19 @@ POI_SOURCE_FILES = {
     "medcenters": DATA_DIR / "almaty_medcenters.csv",
     "energy": DATA_DIR / "almaty_energy.csv",
     "restaurants_coffee": DATA_DIR / "almaty_restaurants_coffee.csv",
+    "parks": DATA_DIR / "almaty_parks.csv",
+    "supermarkets": DATA_DIR / "almaty_supermarkets.csv",
+    "fitness": DATA_DIR / "almaty_fitness.csv",
 }
 
 AIR_QUALITY_RAW_PATH = DATA_DIR / "air_quality.csv"
 AIR_PM25_MAX_PLAUSIBLE = 500.0
+
+CRIME_RAW_PATH = DATA_DIR / "almaty_crime_rate_by_district.csv"
+CRIME_REFERENCE_YEAR = 2025
+
+MACRO_INFLATION_PATH = DATA_DIR / "cleaned_macroeconomics.csv"
+MACRO_MARKET_PATH = DATA_DIR / "cleaned_real_estate_market.csv"
 
 ADS_COLUMNS = [
     "listing_id",
@@ -99,6 +109,7 @@ DEFAULT_EXPLANATION_CATEGORIES = (
     "universities",
     "kindergartens",
     "metro",
+    "bus_stops",
     "transport",
     "clinics",
     "dentistry",
@@ -107,6 +118,9 @@ DEFAULT_EXPLANATION_CATEGORIES = (
     "medcenters",
     "energy",
     "restaurants_coffee",
+    "parks",
+    "supermarkets",
+    "fitness",
 )
 EXPLANATION_RADIUS_M = 300.0
 
@@ -117,7 +131,8 @@ POI_CATEGORY_LABELS = {
     "schools": "школа",
     "universities": "университет",
     "metro": "метро",
-    "transport": "транспорт",
+    "transport": "транспортный узел",
+    "bus_stops": "автобусная остановка",
     "kindergartens": "детский сад",
     "clinics": "клиника",
     "dentistry": "стоматология",
@@ -126,4 +141,7 @@ POI_CATEGORY_LABELS = {
     "medcenters": "медцентр",
     "energy": "энергообъект",
     "restaurants_coffee": "ресторан кофейня",
+    "parks": "парк",
+    "supermarkets": "супермаркет",
+    "fitness": "фитнес-клуб",
 }

@@ -3,10 +3,13 @@ from __future__ import annotations
 import os
 from importlib import import_module
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+load_dotenv()
 
 from .krisha import parse_krisha_listing_url
 from .recommendation_features import (
@@ -40,6 +43,8 @@ class RecommendationResponse(BaseModel):
 
 class ApartmentEvaluationRequest(BaseModel):
     url: str = Field(min_length=10, max_length=2000)
+    language: Literal["ru", "en"] = Field(default="ru")
+    use_llm: bool | None = Field(default=None)
 
 
 class ApartmentEvaluationResponse(BaseModel):
@@ -115,7 +120,11 @@ def evaluate_apartment(
 ) -> ApartmentEvaluationResponse:
     try:
         listing = parse_krisha_listing_url(request.url)
-        evaluation = evaluator.evaluate(listing)
+        evaluation = evaluator.evaluate(
+            listing,
+            language=request.language,
+            use_llm=request.use_llm,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
