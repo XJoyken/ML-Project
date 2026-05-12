@@ -8,6 +8,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "datasets"
 PROCESSED_DIR = DATA_DIR / "processed"
 PROCESSED_DATASET_PATH = PROCESSED_DIR / "ads_model_v1.csv"
+MODELS_DIR = ROOT_DIR / "models"
+DEFAULT_APARTMENT_MODEL_DIR = MODELS_DIR / "apartment_price_model"
 DEFAULT_MODEL_NAME = "catboost"
 MLFLOW_EXPERIMENT_NAME = "almaty-apartment-prices"
 

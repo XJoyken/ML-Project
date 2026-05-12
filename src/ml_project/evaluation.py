@@ -4,14 +4,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-import mlflow.catboost
+import mlflow.lightgbm
 
 from .air import load_air_catalog
 from .constants import (
     AIR_QUALITY_RAW_PATH,
+    DEFAULT_APARTMENT_MODEL_DIR,
     DEFAULT_EXPLANATION_CATEGORIES,
     POI_SOURCE_FILES,
-    ROOT_DIR,
 )
 from .data import load_listings
 from .features import FeatureSchema, build_inference_frame
@@ -19,30 +19,22 @@ from .models import wrap_loaded_model
 from .poi import load_poi_catalog
 from .predict import build_explanation, get_verdict
 
-DEFAULT_MODEL_ARTIFACT_PATH = (
-    ROOT_DIR / "mlruns/1/models/m-7288ada3b93d42b79bcd9a35ca469d02/artifacts"
-)
-DEFAULT_SCHEMA_PATH = (
-    ROOT_DIR / "mlruns/1/5829d06ee0da4d3185a4d40e58791ee2/artifacts/schema.json"
-)
+MODEL_NAME = "lightgbm"
 
 
 class ApartmentEvaluationService:
     def __init__(
         self,
         *,
-        model_artifact_path: Path = DEFAULT_MODEL_ARTIFACT_PATH,
-        schema_path: Path = DEFAULT_SCHEMA_PATH,
-        model_name: str = "catboost",
+        model_dir: Path = DEFAULT_APARTMENT_MODEL_DIR,
     ):
         self.reference_ads = load_listings()
         self.poi_catalog = load_poi_catalog(POI_SOURCE_FILES)
         self.air_catalog = load_air_catalog(AIR_QUALITY_RAW_PATH)
-        self.schema = load_schema(schema_path)
-        loaded_model = mlflow.catboost.load_model(str(model_artifact_path))
-        self.model = wrap_loaded_model(model_name, loaded_model)
-        self.model_name = model_name
-        self.model_artifact_path = str(model_artifact_path)
+        self.schema = load_schema(model_dir / "schema.json")
+        loaded_model = mlflow.lightgbm.load_model(str(model_dir))
+        self.model = wrap_loaded_model(MODEL_NAME, loaded_model)
+        self.model_dir = str(model_dir)
 
     def evaluate(self, listing: dict[str, Any]) -> dict[str, Any]:
         processed, _ = build_inference_frame(
@@ -65,8 +57,8 @@ class ApartmentEvaluationService:
         nearest_air = self.air_catalog.nearest_for(lat=lat, lon=lon)
 
         return {
-            "model": self.model_name,
-            "model_artifact_path": self.model_artifact_path,
+            "model": MODEL_NAME,
+            "model_dir": self.model_dir,
             "predicted_price_kzt": predicted_price,
             "listing_price_kzt": listing_price,
             "delta_percent": delta_percent,
