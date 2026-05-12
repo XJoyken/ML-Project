@@ -7,17 +7,22 @@ from typing import Any
 import mlflow.lightgbm
 
 from .air import load_air_catalog
+from .calibration import PriceCalibration, load_or_compute_calibration
 from .constants import (
     AIR_QUALITY_RAW_PATH,
+    CRIME_RAW_PATH,
     DEFAULT_APARTMENT_MODEL_DIR,
     DEFAULT_EXPLANATION_CATEGORIES,
     POI_SOURCE_FILES,
+    PROCESSED_DATASET_PATH,
 )
+from .crime import load_crime_catalog
 from .data import load_listings
 from .features import FeatureSchema, build_inference_frame
 from .models import wrap_loaded_model
+from .narrative import Language, NarrativeReport, generate as generate_narrative
 from .poi import load_poi_catalog
-from .predict import build_explanation, get_verdict
+from .predict import get_verdict
 
 MODEL_NAME = "lightgbm"
 
@@ -27,34 +32,64 @@ class ApartmentEvaluationService:
         self,
         *,
         model_dir: Path = DEFAULT_APARTMENT_MODEL_DIR,
+        processed_path: Path = PROCESSED_DATASET_PATH,
     ):
         self.reference_ads = load_listings()
         self.poi_catalog = load_poi_catalog(POI_SOURCE_FILES)
         self.air_catalog = load_air_catalog(AIR_QUALITY_RAW_PATH)
+        self.crime_catalog = load_crime_catalog(CRIME_RAW_PATH)
         self.schema = load_schema(model_dir / "schema.json")
         loaded_model = mlflow.lightgbm.load_model(str(model_dir))
         self.model = wrap_loaded_model(MODEL_NAME, loaded_model)
         self.model_dir = str(model_dir)
+        self.calibration: PriceCalibration = load_or_compute_calibration(
+            model_dir=model_dir,
+            model=self.model,
+            schema=self.schema,
+            processed_path=processed_path,
+        )
 
-    def evaluate(self, listing: dict[str, Any]) -> dict[str, Any]:
+    def evaluate(
+        self,
+        listing: dict[str, Any],
+        *,
+        language: Language = "ru",
+        use_llm: bool | None = None,
+    ) -> dict[str, Any]:
         processed, _ = build_inference_frame(
             listing,
             reference_ads=self.reference_ads,
             poi_catalog=self.poi_catalog,
             air_catalog=self.air_catalog,
+            crime_catalog=self.crime_catalog,
         )
         predicted_price = float(self.model.predict(processed, self.schema)[0])
         listing_price = float(processed.iloc[0][self.schema.target_column])
         delta_percent = ((predicted_price - listing_price) / predicted_price) * 100.0
-        verdict = get_verdict(listing_price, predicted_price)
+        legacy_verdict = get_verdict(listing_price, predicted_price)
         lat = float(processed.iloc[0]["lat"])
         lon = float(processed.iloc[0]["lon"])
+        district = str(processed.iloc[0]["district"]) if "district" in processed.columns else None
         nearby_pois = self.poi_catalog.nearest_many(
             lat=lat,
             lon=lon,
             categories=DEFAULT_EXPLANATION_CATEGORIES,
         )
         nearest_air = self.air_catalog.nearest_for(lat=lat, lon=lon)
+        crime_info = self.crime_catalog.lookup(district)
+        interval_low, interval_high = self.calibration.interval_for(predicted_price)
+
+        report: NarrativeReport = generate_narrative(
+            listing_price_kzt=listing_price,
+            predicted_price_kzt=predicted_price,
+            nearby_pois=nearby_pois,
+            nearest_air=nearest_air,
+            crime=crime_info,
+            language=language,
+            interval_low_kzt=interval_low,
+            interval_high_kzt=interval_high,
+            use_llm=use_llm,
+        )
 
         return {
             "model": MODEL_NAME,
@@ -62,10 +97,17 @@ class ApartmentEvaluationService:
             "predicted_price_kzt": predicted_price,
             "listing_price_kzt": listing_price,
             "delta_percent": delta_percent,
-            "verdict": verdict,
-            "summary_text": build_explanation(verdict, delta_percent, nearby_pois, nearest_air),
+            "price_interval": {
+                "coverage": self.calibration.coverage,
+                "low_kzt": interval_low,
+                "high_kzt": interval_high,
+            },
+            "verdict": legacy_verdict,
+            "final_verdict": report.final_verdict,
+            "narrative": report.model_dump(),
             "nearby_pois": nearby_pois,
             "nearest_air_sensor": nearest_air,
+            "crime": crime_info,
         }
 
 

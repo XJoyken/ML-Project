@@ -232,10 +232,6 @@ def validate_inference_frame(frame: pd.DataFrame):
         "rooms": "rooms",
         "lat": "lat",
         "lon": "lon",
-        "district": "district",
-        "house_type": "house_type",
-        "condition": "condition",
-        "bathroom_type": "bathroom_type",
         TARGET_COLUMN: "listing_price_kzt",
     }
     missing = [

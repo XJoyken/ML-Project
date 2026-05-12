@@ -7,7 +7,7 @@ from ml_project.train import train_model
 
 
 def run_pipeline(
-    model_name: str = "catboost",
+    model_name: str = "lightgbm",
     *,
     test_size: float = 0.2,
     random_state: int = 42,

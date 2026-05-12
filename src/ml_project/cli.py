@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     model_choices = ["catboost", "lightgbm", "xgboost"]
 
     train_parser = subparsers.add_parser("train", help="Train a model.")
-    train_parser.add_argument("--model", default="catboost", choices=model_choices)
+    train_parser.add_argument("--model", default="lightgbm", choices=model_choices)
     train_parser.add_argument("--test-size", type=float, default=0.2)
     train_parser.add_argument("--random-state", type=int, default=42)
     train_parser.add_argument("--experiment-name", default=MLFLOW_EXPERIMENT_NAME)
@@ -35,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a model.")
-    evaluate_parser.add_argument("--model", default="catboost", choices=model_choices)
+    evaluate_parser.add_argument("--model", default="lightgbm", choices=model_choices)
     evaluate_parser.add_argument("--test-size", type=float, default=0.2)
     evaluate_parser.add_argument("--random-state", type=int, default=42)
     evaluate_parser.add_argument(
@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     predict_parser = subparsers.add_parser("predict", help="Predict fair price and explanation.")
-    predict_parser.add_argument("--model", default="catboost", choices=model_choices)
+    predict_parser.add_argument("--model", default="lightgbm", choices=model_choices)
     predict_parser.add_argument(
         "--params",
         help="Model hyperparameters as JSON (string or path to .json file).",
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         experiment_name = args.experiment_name if args.command else MLFLOW_EXPERIMENT_NAME
         model_params = _load_model_params(getattr(args, "params", None)) if args.command else None
         result = train_model(
-            args.model if args.command else "catboost",
+            args.model if args.command else "lightgbm",
             test_size=args.test_size if args.command else 0.2,
             random_state=args.random_state if args.command else 42,
             experiment_name=experiment_name,

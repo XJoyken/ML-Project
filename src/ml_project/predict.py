@@ -6,6 +6,7 @@ from typing import Any
 from .air import load_air_catalog
 from .constants import (
     AIR_QUALITY_RAW_PATH,
+    CRIME_RAW_PATH,
     DEFAULT_EXPLANATION_CATEGORIES,
     EXPLANATION_RADIUS_M,
     MLFLOW_EXPERIMENT_NAME,
@@ -14,6 +15,7 @@ from .constants import (
     VERDICT_OVERPRICED_THRESHOLD,
     VERDICT_UNDERVALUED_THRESHOLD,
 )
+from .crime import load_crime_catalog
 from .data import get_listing_input, load_listings
 from .features import build_inference_frame
 from .poi import load_poi_catalog
@@ -22,7 +24,7 @@ from .train import train_model
 
 
 def predict_price(
-    model_name: str = "catboost",
+    model_name: str = "lightgbm",
     *,
     listing_id: str | int | None = None,
     listing: dict[str, Any] | None = None,
@@ -37,6 +39,7 @@ def predict_price(
         reference_ads = load_listings(ads_path=ads_path)
         poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
         air_catalog = load_air_catalog(raw_path=air_quality_path or AIR_QUALITY_RAW_PATH)
+        crime_catalog = load_crime_catalog(raw_path=CRIME_RAW_PATH)
         run, model, schema = load_latest_model(experiment_name, model_name)
         mlflow_run_id: str | None = run.info.run_id
     else:
@@ -53,6 +56,7 @@ def predict_price(
         reference_ads = training["listings"]
         poi_catalog = training["poi_catalog"]
         air_catalog = training["air_catalog"]
+        crime_catalog = training["crime_catalog"]
         model = training["model"]
         schema = training["schema"]
         mlflow_run_id = None
@@ -67,6 +71,7 @@ def predict_price(
         reference_ads=reference_ads,
         poi_catalog=poi_catalog,
         air_catalog=air_catalog,
+        crime_catalog=crime_catalog,
     )
     predicted_price = float(model.predict(processed, schema)[0])
     listing_price = float(processed.iloc[0][schema.target_column])
