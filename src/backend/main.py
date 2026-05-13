@@ -64,14 +64,52 @@ class ApartmentEvaluationResponse(BaseModel):
 
 
 class InvestmentParamsOverride(BaseModel):
-    vacancy_rate: float | None = Field(default=0.08, ge=0.0, le=0.9)
-    repair_cost_pct: float | None = Field(default=0.05, ge=0.0, le=0.5)
-    agent_commission_months: float | None = Field(default=0.5, ge=0.0, le=3.0)
-    tenant_turnover_years: float | None = Field(default=1.0, ge=0.5, le=10.0)
-    maintenance_pct: float | None = Field(default=0.05, ge=0.0, le=0.3)
-    property_tax_pct: float | None = Field(default=0.003, ge=0.0, le=0.05)
-    discount_rate_pct: float | None = Field(default=0.153, ge=0.0, le=50.0) #Current inflation + 3%
-    horizon_years: int | None = Field(default=10, ge=1, le=30)
+    vacancy_rate: float | None = Field(
+        default=0.08, ge=0.0, le=0.9,
+        description="Share of year the apartment stands empty (0.08 = 8%). Default 8%.",
+    )
+    repair_cost_pct: float | None = Field(
+        default=0.05, ge=0.0, le=0.5,
+        description="One-time repair cost as a fraction of sale price (0.05 = 5%). Default 5%.",
+    )
+    agent_commission_months: float | None = Field(
+        default=0.5, ge=0.0, le=3.0,
+        description=(
+            "Broker fee in months of rent paid once per tenant turnover (0.5 = half a month). "
+            "Default 0.5."
+        ),
+    )
+    tenant_turnover_years: float | None = Field(
+        default=1.5, ge=0.5, le=10.0,
+        description="Average number of years a single tenant stays before being replaced. Default 1.5.",
+    )
+    maintenance_pct: float | None = Field(
+        default=0.05, ge=0.0, le=0.3,
+        description="Annual maintenance/running costs as a fraction of gross rent (0.05 = 5%). Default 5%.",
+    )
+    property_tax_pct: float | None = Field(
+        default=0.003, ge=0.0, le=0.05,
+        description="Annual property tax as a fraction of sale price (0.003 = 0.3%). Default 0.3%.",
+    )
+    inflation_rate_pct: float | None = Field(
+        default=12.3, ge=0.0, le=100.0,
+        description=(
+            "Expected annual CPI inflation in percent. "
+            "Default: 12.3% (Kazakhstan 2025 actual from macro dataset). "
+            "The system adds risk_premium_pct to this to get the discount rate."
+        ),
+    )
+    risk_premium_pct: float | None = Field(
+        default=3.0, ge=0.0, le=20.0,
+        description=(
+            "Extra annual return required above inflation to justify illiquid real estate, in pp. "
+            "Default 3 pp. Discount rate = inflation_rate_pct + risk_premium_pct = 15.3%."
+        ),
+    )
+    horizon_years: int | None = Field(
+        default=10, ge=1, le=30,
+        description="Investment horizon for NPV calculation in years. Default 10.",
+    )
 
 
 class InvestmentRequest(BaseModel):
@@ -269,7 +307,8 @@ def evaluate_investment(
         tenant_turnover_years=override.tenant_turnover_years,
         maintenance_pct=override.maintenance_pct,
         property_tax_pct=override.property_tax_pct,
-        discount_rate_pct=override.discount_rate_pct,
+        inflation_rate_pct=override.inflation_rate_pct,
+        risk_premium_pct=override.risk_premium_pct,
         horizon_years=override.horizon_years,
     )
     investment = investment_module.compute_investment_metrics(

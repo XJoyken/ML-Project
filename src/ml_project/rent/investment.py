@@ -36,7 +36,7 @@ DEFAULT_AGENT_COMMISSION_MONTHS = 0.5  # 0.5 month rent paid each turnover
 DEFAULT_TENANT_TURNOVER_YEARS = 1.5    # avg tenant stays 1.5 years
 DEFAULT_MAINTENANCE_PCT = 0.05         # 5% of annual gross rent for maintenance/repairs
 DEFAULT_PROPERTY_TAX_PCT = 0.003       # 0.3% of sale price per year (Almaty 0.1-0.5% range)
-DEFAULT_RISK_PREMIUM_PCT = 3.0         # 3 percentage points above CPI inflation
+DEFAULT_RISK_PREMIUM_PCT = 3.0         # 3 pp added to user-supplied inflation for discount rate
 DEFAULT_HORIZON_YEARS = 10
 
 # Payback thresholds for verdict (inflation-adjusted years).
@@ -49,7 +49,15 @@ VERDICT_PAYBACK_THRESHOLDS = {
 
 @dataclass(slots=True)
 class InvestmentParams:
-    """User-overridable economic assumptions. Set any field to None to use default."""
+    """User-overridable economic assumptions. Set any field to None to use default.
+
+    The discount rate is NOT accepted directly from the user. Instead, supply:
+      - inflation_rate_pct: annual CPI inflation (%). Defaults to the latest year from the
+        macro dataset (2025 actual). The user sees and overrides this — it is intuitive.
+      - risk_premium_pct: extra return required above inflation to justify illiquid real
+        estate vs other investments. Defaults to 3 pp (conservative Almaty estimate).
+    discount_rate_pct is computed as inflation_rate_pct + risk_premium_pct.
+    """
 
     vacancy_rate: float | None = None
     repair_cost_pct: float | None = None
@@ -57,11 +65,14 @@ class InvestmentParams:
     tenant_turnover_years: float | None = None
     maintenance_pct: float | None = None
     property_tax_pct: float | None = None
-    discount_rate_pct: float | None = None
+    inflation_rate_pct: float | None = None   # user-supplied; defaults to latest macro CPI
+    risk_premium_pct: float | None = None     # added to inflation to get discount rate
     horizon_years: int | None = None
 
     def resolved(self, *, inflation: InflationCatalog) -> "ResolvedInvestmentParams":
         latest_pct = inflation.annual_pct(inflation.latest_year) or 0.0
+        inflation_rate = _default(self.inflation_rate_pct, latest_pct)
+        risk_premium = _default(self.risk_premium_pct, DEFAULT_RISK_PREMIUM_PCT)
         return ResolvedInvestmentParams(
             vacancy_rate=_default(self.vacancy_rate, DEFAULT_VACANCY_RATE),
             repair_cost_pct=_default(self.repair_cost_pct, DEFAULT_REPAIR_COST_PCT),
@@ -73,9 +84,9 @@ class InvestmentParams:
             ),
             maintenance_pct=_default(self.maintenance_pct, DEFAULT_MAINTENANCE_PCT),
             property_tax_pct=_default(self.property_tax_pct, DEFAULT_PROPERTY_TAX_PCT),
-            discount_rate_pct=_default(
-                self.discount_rate_pct, latest_pct + DEFAULT_RISK_PREMIUM_PCT
-            ),
+            inflation_rate_pct=float(inflation_rate),
+            risk_premium_pct=float(risk_premium),
+            discount_rate_pct=float(inflation_rate + risk_premium),
             horizon_years=int(_default(self.horizon_years, DEFAULT_HORIZON_YEARS)),
         )
 
@@ -88,7 +99,9 @@ class ResolvedInvestmentParams:
     tenant_turnover_years: float
     maintenance_pct: float
     property_tax_pct: float
-    discount_rate_pct: float
+    inflation_rate_pct: float
+    risk_premium_pct: float
+    discount_rate_pct: float   # = inflation_rate_pct + risk_premium_pct
     horizon_years: int
 
     def as_dict(self) -> dict[str, Any]:

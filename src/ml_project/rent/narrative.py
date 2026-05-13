@@ -169,38 +169,54 @@ buying and renting out. You receive a structured payload with four parts:
 Rules:
 - {language_instruction}
 - Treat ALL numbers as facts from the payload. Never invent figures.
-- Round KZT amounts to the nearest 10 000 or use millions with one decimal (X.X млн ₸).
-  Round percentages to one decimal. Round distances to 10 m / 0.1 km.
+- For KZT: use exact values or millions with TWO decimals (X.XX млн ₸) — never round to nearest 10k.
+  For percentages: use exact values from the payload, e.g. "8.29%", not "8%".
+  For distances: use EXACT values from the payload, do NOT round.
 - Never wrap proper nouns (POI names, district names, ЖК names) in quotation marks of any kind.
 - Each paragraph 2-4 dense sentences. No filler, no generic praise.
 
 Required content per paragraph:
-- lead: one short sentence stating the overall verdict (excellent / good / average / poor)
-  along with the most important number (e.g., payback years, OR yield-vs-market gap).
-- price_paragraph: cite predicted price, listed price, the gap as %, the conformal
-  interval bounds. Say whether the listing is undervalued, fair, or overpriced.
-- investment_paragraph: cite predicted_rent_kzt, gross_yield_pct, net_yield_pct,
-  payback_years_inflation_adjusted, npv_kzt (millions), irr_pct. State which params
-  were used (vacancy_rate, repair_cost_pct, discount_rate_pct) if they are non-default
-  or particularly impactful.
-- market_context_paragraph: cite market.rental_yield_annual_pct, market.rent_growth_annual_pct,
-  market.secondary_growth_annual_pct, inflation.latest_annual_pct. Say whether this listing
-  beats or trails market and by how many percentage points.
-- location_paragraph: pick 4-6 most relevant nearby_pois with concrete distances.
-  Frame them through the RENTAL lens: who is the likely tenant?
-    - universities/metro near → students, young professionals
-    - schools/kindergartens/parks → families with kids
-    - bus_stops/clinics → broader demographics
-  Mention PM2.5 cold and warm day values with the verdict tier (≤15 отлично, ≤25 хорошо,
-  ≤40 умеренно, ≤60 плохо, >60 очень плохо) — air quality matters for rent demand.
-  Mention crime tier with district name.
-- risks: 2-4 concrete bullet points. Examples: "вакантность выше 8% обнулит net yield",
-  "при росте ставки дисконтирования до 18% NPV становится отрицательным",
-  "ремонт может выйти дороже заложенных 5% от цены".
-- verdict + verdict_text: copy the verdict from `investment.verdict` and write ONE sentence
-  summarising it for the user.
+- lead: one short sentence with the overall verdict (excellent / good / average / poor) and the
+  single most important number (payback in years, or yield-vs-market gap in pp).
 
-Do not output JSON outside the schema fields. Do not use markdown formatting characters.
+- price_paragraph: cite the EXACT predicted price, listed price, gap as %, and the conformal
+  interval bounds (low_kzt and high_kzt). State whether the listing is undervalued, fair, or overpriced.
+
+- investment_paragraph: THIS IS THE MOST IMPORTANT PARAGRAPH. You MUST include:
+  1. Predicted monthly rent (exact figure, e.g. "330 952 ₸/мес").
+  2. Gross yield and net yield (exact figures, e.g. "gross 8.29% / net 7.33%").
+  3. Payback — both nominal and inflation-adjusted years.
+  4. NPV at the specified horizon and IRR (exact figures).
+  5. ALL assumptions used, stated explicitly and naturally in the text. Use this exact format
+     for the assumption list (adapt language to RU/EN):
+     "Расчёт выполнен при следующих условиях: вакантность X%, затраты на ремонт Y% от цены покупки,
+     комиссия агента Z мес/арендатора при смене раз в N лет, обслуживание M% от аренды в год,
+     налог на недвижимость T% в год, ставка дисконтирования R% (инфляция + риск-премия), горизонт H лет."
+     Replace every letter with the EXACT value from investment.params.
+  6. Do not say "default" or "non-default" — always state the number.
+
+- market_context_paragraph: cite market.rental_yield_annual_pct, market.rent_growth_annual_pct,
+  market.secondary_growth_annual_pct, inflation.latest_annual_pct (exact values). Say whether
+  this listing beats or trails market yield and by exactly how many pp.
+
+- location_paragraph: pick 4-6 relevant nearby_pois with EXACT distances and POI names.
+  Frame through the RENTAL lens: who is the likely tenant for this location?
+    - universities/metro near → students, young professionals
+    - schools/kindergartens/parks → families with children
+    - bus_stops/clinics → broad demographics
+  For bus_stops: list routes in parentheses. Codes starting with "Тр" mean trolleybus
+  (e.g. "Тр6" = троллейбус №6). Format: "остановка Имя в X м (автобусы A, B; троллейбус ТрC)".
+  Cite exact PM2.5 values: cold day and warm day. Tier: ≤15 отлично, ≤25 хорошо, ≤40 умеренно,
+  ≤60 плохо, >60 очень плохо. Mention crime tier with exact count and district name.
+
+- risks: 2-4 concrete bullet points that reference the ACTUAL numbers already used:
+  e.g. "если реальная вакантность окажется 15% вместо заложенных 8%, net yield упадёт с 7.33% до ~6.5%",
+  "ставка дисконтирования 15.3% чувствительна к инфляции — рост до 18% снизит NPV на ~X млн ₸".
+  Make risks feel like they belong to THIS specific apartment, not generic advice.
+
+- verdict + verdict_text: copy verdict from `investment.verdict`, write ONE sentence with the final call.
+
+Do not output JSON outside the schema fields. Do not use markdown formatting characters (no **, no ##).
 """.strip()
 
 
@@ -258,18 +274,25 @@ def _det_price(sale_evaluation: dict[str, Any], language: Language) -> str:
         return ""
     if language == "en":
         parts = [
-            f"Listed at {listed / 1e6:.1f}M KZT vs model estimate {pred / 1e6:.1f}M KZT "
-            f"({(delta or 0):+.1f}%)."
+            f"Listed at {int(listed):,} KZT ({listed / 1e6:.2f}M) vs model estimate "
+            f"{int(pred):,} KZT ({pred / 1e6:.2f}M) — gap {(delta or 0):+.1f}%."
         ]
         if low is not None and high is not None:
-            parts.append(f"90% confidence interval: {low / 1e6:.1f}M–{high / 1e6:.1f}M KZT.")
+            parts.append(
+                f"90% confidence interval: {int(low):,}–{int(high):,} KZT "
+                f"({low / 1e6:.2f}M–{high / 1e6:.2f}M)."
+            )
         return " ".join(parts)
     parts = [
-        f"Цена объявления {listed / 1e6:.1f} млн ₸ против оценки модели {pred / 1e6:.1f} млн ₸ "
-        f"(отклонение {(delta or 0):+.1f}%)."
+        f"Цена объявления {int(listed):,} ₸ ({listed / 1e6:.2f} млн ₸), "
+        f"оценка модели {int(pred):,} ₸ ({pred / 1e6:.2f} млн ₸), "
+        f"отклонение {(delta or 0):+.1f}%."
     ]
     if low is not None and high is not None:
-        parts.append(f"Доверительный интервал 90%: {low / 1e6:.1f}–{high / 1e6:.1f} млн ₸.")
+        parts.append(
+            f"Доверительный интервал 90%: {int(low):,}–{int(high):,} ₸ "
+            f"({low / 1e6:.2f}–{high / 1e6:.2f} млн ₸)."
+        )
     return " ".join(parts)
 
 
@@ -277,30 +300,64 @@ def _det_investment(investment: dict[str, Any], language: Language) -> str:
     monthly = investment.get("monthly_rent_kzt", 0)
     gross = investment.get("gross_yield_pct", 0)
     net = investment.get("net_yield_pct", 0)
+    payback_nom = investment.get("payback_years_nominal")
     payback_real = investment.get("payback_years_inflation_adjusted")
     npv = investment.get("npv_kzt", 0)
     irr = investment.get("irr_pct")
-    horizon = (investment.get("params") or {}).get("horizon_years", 10)
+    p = investment.get("params") or {}
+    horizon = p.get("horizon_years", 10)
+    vacancy = p.get("vacancy_rate", 0.08)
+    repair = p.get("repair_cost_pct", 0.05)
+    agent_months = p.get("agent_commission_months", 0.5)
+    turnover = p.get("tenant_turnover_years", 1.5)
+    maint = p.get("maintenance_pct", 0.05)
+    tax = p.get("property_tax_pct", 0.003)
+    inflation = p.get("inflation_rate_pct", 12.3)
+    risk_prem = p.get("risk_premium_pct", 3.0)
+    discount = p.get("discount_rate_pct", inflation + risk_prem)
+
     if language == "en":
         parts = [
-            f"Predicted monthly rent ≈ {monthly / 1000:.0f}K KZT.",
+            f"Predicted monthly rent: {int(monthly):,} KZT.",
             f"Gross yield {gross:.2f}% / net yield {net:.2f}%.",
         ]
+        if payback_nom is not None:
+            parts.append(f"Nominal payback {payback_nom:.1f} yr.")
         if payback_real is not None:
-            parts.append(f"Inflation-adjusted payback ≈ {payback_real:.1f} years.")
-        parts.append(f"NPV over {horizon} years: {npv / 1e6:+.1f}M KZT.")
+            parts.append(f"Inflation-adjusted payback {payback_real:.1f} yr.")
+        parts.append(f"NPV over {horizon} years: {npv / 1e6:+.2f}M KZT.")
         if irr is not None:
-            parts.append(f"IRR ≈ {irr:.1f}%.")
+            parts.append(f"IRR {irr:.2f}%.")
+        parts.append(
+            f"Assumptions: vacancy {vacancy * 100:.0f}%, repair {repair * 100:.0f}% of price, "
+            f"agent commission {agent_months} months per {turnover:.1f}-year tenancy, "
+            f"maintenance {maint * 100:.0f}% of rent/yr, property tax {tax * 100:.1f}% of price/yr, "
+            f"discount rate {discount:.1f}% (inflation {inflation:.1f}% + risk premium {risk_prem:.1f}%), "
+            f"horizon {horizon} years."
+        )
         return " ".join(parts)
+
     parts = [
-        f"Прогноз месячной аренды ≈ {monthly / 1000:.0f} тыс ₸.",
+        f"Прогноз месячной аренды: {int(monthly):,} ₸.",
         f"Gross yield {gross:.2f}% / net yield {net:.2f}%.",
     ]
+    if payback_nom is not None:
+        parts.append(f"Номинальная окупаемость {payback_nom:.1f} лет.")
     if payback_real is not None:
-        parts.append(f"Окупаемость с инфляцией ≈ {payback_real:.1f} лет.")
-    parts.append(f"NPV за {horizon} лет: {npv / 1e6:+.1f} млн ₸.")
+        parts.append(f"Окупаемость с учётом инфляции {payback_real:.1f} лет.")
+    parts.append(f"NPV за {horizon} лет: {npv / 1e6:+.2f} млн ₸.")
     if irr is not None:
-        parts.append(f"IRR ≈ {irr:.1f}%.")
+        parts.append(f"IRR {irr:.2f}%.")
+    parts.append(
+        f"Расчёт выполнен при следующих условиях: вакантность {vacancy * 100:.0f}%, "
+        f"ремонт {repair * 100:.0f}% от цены покупки, "
+        f"комиссия риелтора {agent_months} мес/арендатора при смене раз в {turnover:.1f} лет, "
+        f"обслуживание {maint * 100:.0f}% от аренды в год, "
+        f"налог на недвижимость {tax * 100:.1f}% в год, "
+        f"ставка дисконтирования {discount:.1f}% "
+        f"(инфляция {inflation:.1f}% + риск-премия {risk_prem:.1f}%), "
+        f"горизонт {horizon} лет."
+    )
     return " ".join(parts)
 
 

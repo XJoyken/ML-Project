@@ -111,6 +111,8 @@ def test_investment_endpoint_respects_override_params(client):
                 "maintenance_pct": 0.0,
                 "property_tax_pct": 0.0,
                 "agent_commission_months": 0.0,
+                "inflation_rate_pct": 12.0,
+                "risk_premium_pct": 3.0,
                 "horizon_years": 5,
             },
         },

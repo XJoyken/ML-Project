@@ -56,7 +56,8 @@ def test_explicit_params_override_defaults(macro):
         maintenance_pct=0.0,
         property_tax_pct=0.0,
         agent_commission_months=0.0,
-        discount_rate_pct=0.0,
+        inflation_rate_pct=0.0,
+        risk_premium_pct=0.0,
         horizon_years=10,
     )
     result = compute_investment_metrics(

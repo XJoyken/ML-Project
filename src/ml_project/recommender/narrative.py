@@ -162,11 +162,15 @@ Rules:
   name it as the explicit compromise: "комнат меньше на 1", "цена выше бюджета на 4 млн", etc.
 
   Section 2 — Nearby objects (REQUIRED, never skip even if obvious). Read nearby_pois and
-  describe AT LEAST 4 distinct POI categories with their distance in meters (rounded to 10 m) and the
-  POI name. Group them by relevance: schools/kindergartens/universities for families and students,
-  metro/bus_stops for commuting, parks/restaurants_coffee/fitness for daily life, clinics/hospitals
-  for medical access. If a category is unusually far (acceptable or far tier per the eval module),
-  explicitly say so — that is a real downside.
+  describe AT LEAST 4 distinct POI categories with their EXACT distance in meters (use the number
+  as-is from the payload, do NOT round) and the POI name. Group them by relevance:
+  schools/kindergartens/universities for families and students, metro/bus_stops for commuting,
+  parks/restaurants_coffee/fitness for daily life, clinics/hospitals for medical access.
+  If a category is unusually far, explicitly say so — that is a real downside.
+  For "bus_stops" entries: ALWAYS list the routes from the routes_list field in parentheses.
+  Codes starting with "Тр" mean trolleybus (e.g. "Тр6" = trolleybus route 6).
+  Format (RU): "остановка Музей искусств в 210 м (автобусы 18, 95; троллейбус Тр6)."
+  Format (EN): "bus stop Museum of Arts, 210 m (bus routes 18, 95; trolleybus Tr6)."
 
   Section 3 — Air quality (REQUIRED whenever air data is present). State the PM2.5 numbers for both
   cold day and warm day with the verdict tier (≤15 отличный, ≤25 хороший, ≤25-40 умеренный,
@@ -187,7 +191,8 @@ Rules:
 - Never wrap proper nouns (POI names, district names, ЖК names) in quotation marks of any kind.
   Bad: "Бостандыкский район". Good: Бостандыкский район.
 - Use only data from the payload. Never invent POIs, district names, or numbers.
-- Write distances in meters when < 1000 m, in kilometers (one decimal) when ≥ 1000 m.
+- Write distances using EXACT values from the payload. Do NOT round distances.
+  Express in meters when < 1000 m (e.g. "547 м"), in kilometers with one decimal when ≥ 1000 m (e.g. "1.3 км").
 """.strip()
 
 
