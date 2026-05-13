@@ -520,25 +520,32 @@ Avoid categories (farther is better):
 
 Rules:
 - {language_instruction}
-- lead: one short sentence stating whether the listing price is low, fair, or high relative to the model.
-- pros: list specific positives. Mention concrete distances in meters/kilometers and POI names when given.
-- cons: list specific negatives. If a category is in "far" tier or an avoid category is "too_close" or "concerning", call it out.
-- persona_notes: short notes such as "удобно для семей с детьми (школа в 320 м)" / "convenient for families with kids".
-  Cover at minimum families_with_kids, elderly, students, commuters, singles when supporting POIs exist.
-- Mention the crime tier in pros/cons when provided (low tier → pros, high tier → cons), citing district name and year.
-- The "transport" category means a transport HUB (airport, railway station, intercity bus terminal). Treat it as occasional-use infrastructure: even 2–4 km is normal. Do NOT call a transport hub "далеко/far" by itself; only call it out if the user clearly benefits (e.g., near a railway station) or it is unusually distant.
-- The "bus_stops" category is regular city bus / trolleybus stops. When present, ALWAYS state the distance AND list the routes from routes_list. Format: bus numbers comma-separated, then trolleybus numbers prefixed with "троллейбус №" (RU) or "trolleybus" (EN). Codes starting with "Тр" mean trolleybus (e.g. "Тр6" = trolleybus 6).
+- lead: one sentence stating whether the listing price is low, fair, or high, citing the exact predicted price,
+  listed price, and the gap as a percentage.
+  Example (RU): “Цена 42 000 000 ₸ ниже оценки модели 59 503 692 ₸ на 29.4% — выгодная покупка.”
+- pros: each item should be a FULL sentence (or two) that is dense and informative — not a one-liner.
+  Include the exact distance from the payload (do NOT round), the POI name, and why it matters.
+  Example (RU): “Школа-гимназия №51 находится в 322 метрах, то есть в 4 минутах пешей ходьбы — идеально для семей с детьми.”
+  Include crime tier when provided (low → pros, high → cons), citing exact count and district.
+- cons: same density rule. If a POI is in “far” tier, state the exact distance and explain the inconvenience.
+  If air is poor, state exact PM2.5 values and cite the sensor distance.
+- persona_notes: 1-2 sentences each. Cover families_with_kids, elderly, students, commuters, singles when
+  supporting POIs exist. Cite specific POIs and distances.
+- The “transport” category means a transport HUB (airport, railway, intercity bus). 2–4 km is normal — do NOT
+  call it “далеко/far”. Only call it out if uniquely beneficial (e.g., 200 m from a train station).
+- The “bus_stops” category means regular city bus / trolleybus stops. When present:
+  ALWAYS state the exact distance in meters AND list the routes from routes_list in parentheses.
+  Codes starting with “Тр” mean trolleybus (e.g. “Тр6” = trolleybus route 6).
+  Format (RU): “Остановка Музей искусств в 210 м (автобусы 18, 95, 121; троллейбус Тр6).”
+  Format (EN): “Bus stop Museum of Arts is 210 m away (bus routes 18, 95, 121; trolleybus Tr6).”
+  If routes_list is missing, just state the distance.
 - final_verdict ∈ {{excellent, good, questionable, poor}} based on combined price and neighborhood quality.
 - final_verdict_text: one sentence summarizing the verdict for the user.
-- Be specific. Never invent POIs that are not in the payload.
-- Round distances to the nearest 10 m for clarity.
+- Be specific. Never invent POIs, names, or numbers not in the payload.
+- Use EXACT distances from the payload — do NOT round them.
 - Never wrap POI names, district names or any proper nouns in quotation marks of any kind
-  (no ASCII " ", no «», no “”, no ‘’). Write proper nouns as plain inline text.
-  Good (RU): рядом школа Школа-гимназия №51 в 320 м.
-  Bad  (RU): рядом школа "Школа-гимназия №51" в 320 м.
-  Good (EN): school Gymnasium No. 51 is 320 m away.
-  Bad  (EN): school "Gymnasium No. 51" is 320 m away.
-  Putting distances in parentheses is fine — the rule is only about quoting names.
+  (no ASCII “ “, no «», no “”, no ‘’). Write proper nouns as plain inline text.
+  Good (RU): школа Школа-гимназия №51 в 322 м. Bad (RU): школа “Школа-гимназия №51” в 322 м.
 """.strip()
 
 

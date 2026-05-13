@@ -7,8 +7,10 @@ import json
 import sys
 from pathlib import Path
 
-from .constants import MLFLOW_EXPERIMENT_NAME
+from .constants import MLFLOW_EXPERIMENT_NAME, RENT_MLFLOW_EXPERIMENT_NAME
 from .predict import predict_price
+from .rent.train import evaluate_rent_model, train_rent_model
+from .rent.tune import tune_rent_model
 from .train import evaluate_model, train_model
 from .tune import tune_model
 
@@ -77,6 +79,47 @@ def build_parser() -> argparse.ArgumentParser:
     tune_parser.add_argument("--inner-splits", type=int, default=3)
     tune_parser.add_argument("--seed", type=int, default=42)
 
+    # ---- Rent (Model 3) subcommands -----------------------------------------
+    train_rent_parser = subparsers.add_parser("train-rent", help="Train the rent-price model.")
+    train_rent_parser.add_argument("--model", default="lightgbm", choices=model_choices)
+    train_rent_parser.add_argument("--test-size", type=float, default=0.2)
+    train_rent_parser.add_argument("--random-state", type=int, default=42)
+    train_rent_parser.add_argument("--experiment-name", default=RENT_MLFLOW_EXPERIMENT_NAME)
+    train_rent_parser.add_argument(
+        "--params",
+        help="Model hyperparameters as JSON (string or path to .json file).",
+    )
+    train_rent_parser.add_argument(
+        "--final",
+        action="store_true",
+        help="Two-pass: ES finds best_iter, then refit on full train without ES.",
+    )
+
+    evaluate_rent_parser = subparsers.add_parser("evaluate-rent", help="Evaluate the rent model.")
+    evaluate_rent_parser.add_argument("--model", default="lightgbm", choices=model_choices)
+    evaluate_rent_parser.add_argument("--test-size", type=float, default=0.2)
+    evaluate_rent_parser.add_argument("--random-state", type=int, default=42)
+    evaluate_rent_parser.add_argument(
+        "--params",
+        help="Model hyperparameters as JSON (string or path to .json file).",
+    )
+    evaluate_rent_parser.add_argument(
+        "--final",
+        action="store_true",
+        help="Two-pass: ES finds best_iter, then refit on full train without ES.",
+    )
+
+    tune_rent_parser = subparsers.add_parser(
+        "tune-rent",
+        help="Hyperparameter search for the rent model (random or nested-CV).",
+    )
+    tune_rent_parser.add_argument("--model", required=True, choices=model_choices)
+    tune_rent_parser.add_argument("--mode", default="random", choices=["random", "nested"])
+    tune_rent_parser.add_argument("--trials", type=int, default=15)
+    tune_rent_parser.add_argument("--outer-splits", type=int, default=5)
+    tune_rent_parser.add_argument("--inner-splits", type=int, default=3)
+    tune_rent_parser.add_argument("--seed", type=int, default=42)
+
     return parser
 
 
@@ -115,6 +158,52 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "tune":
         history = tune_model(
+            args.model,
+            mode=args.mode,
+            trials=args.trials,
+            outer_splits=args.outer_splits,
+            inner_splits=args.inner_splits,
+            seed=args.seed,
+        )
+        print()
+        if args.mode == "random":
+            print("Top 5 by MAE:")
+            print(history.head(5).round(4).to_string(index=False))
+        else:
+            print("Per outer fold:")
+            print(history.round(4).to_string(index=False))
+            print()
+            for key in ["outer_mae_kzt", "outer_mape", "outer_r2"]:
+                print(f"{key}: mean={history[key].mean():.4f}, std={history[key].std():.4f}")
+        return 0
+
+    if args.command == "train-rent":
+        result = train_rent_model(
+            args.model,
+            test_size=args.test_size,
+            random_state=args.random_state,
+            experiment_name=args.experiment_name,
+            model_params=_load_model_params(args.params),
+            final=args.final,
+        )
+        print(f"Processed rows: {len(result['processed_frame']):,}")
+        print(f"MLflow experiment: {args.experiment_name}")
+        print(result["metrics_frame"].round(4).to_string(index=False))
+        return 0
+
+    if args.command == "evaluate-rent":
+        result = evaluate_rent_model(
+            args.model,
+            test_size=args.test_size,
+            random_state=args.random_state,
+            model_params=_load_model_params(args.params),
+            final=args.final,
+        )
+        print(result["metrics_frame"].round(4).to_string(index=False))
+        return 0
+
+    if args.command == "tune-rent":
+        history = tune_rent_model(
             args.model,
             mode=args.mode,
             trials=args.trials,

@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .constants import PROCESSED_DATASET_PATH, TARGET_COLUMN
+from .constants import PROCESSED_DATASET_PATH
 from .features import FeatureSchema
 
 DEFAULT_COVERAGE = 0.9
@@ -82,7 +82,7 @@ def compute_calibration(
     if len(processed) > sample_size:
         processed = processed.sample(n=sample_size, random_state=seed)
     predictions = model.predict(processed, schema)
-    log_actual = np.log1p(processed[TARGET_COLUMN].to_numpy(dtype=float))
+    log_actual = np.log1p(processed[schema.target_column].to_numpy(dtype=float))
     log_predicted = np.log1p(np.clip(predictions.astype(float), a_min=0.0, a_max=None))
     abs_residuals = np.abs(log_actual - log_predicted)
     quantile = float(np.quantile(abs_residuals, coverage))

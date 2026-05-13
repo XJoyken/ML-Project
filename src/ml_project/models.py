@@ -4,8 +4,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .constants import TARGET_COLUMN
-
 EARLY_STOPPING_ROUNDS = 50
 EVAL_SIZE = 0.1
 EVAL_RANDOM_STATE = 0
@@ -37,9 +35,9 @@ class CatBoostPriceModel:
         inner, evaluation = split_for_early_stopping(train_frame)
         self.model.fit(
             inner[schema.feature_columns],
-            np.log1p(inner[TARGET_COLUMN]),
+            np.log1p(inner[schema.target_column]),
             cat_features=schema.categorical_features,
-            eval_set=(evaluation[schema.feature_columns], np.log1p(evaluation[TARGET_COLUMN])),
+            eval_set=(evaluation[schema.feature_columns], np.log1p(evaluation[schema.target_column])),
             early_stopping_rounds=EARLY_STOPPING_ROUNDS,
             verbose=False,
         )
@@ -57,7 +55,7 @@ class CatBoostPriceModel:
         self.model = CatBoostRegressor(**self.params)
         self.model.fit(
             train_frame[schema.feature_columns],
-            np.log1p(train_frame[TARGET_COLUMN]),
+            np.log1p(train_frame[schema.target_column]),
             cat_features=schema.categorical_features,
             verbose=False,
         )
@@ -96,11 +94,11 @@ class LightGBMPriceModel:
         inner, evaluation = split_for_early_stopping(train_frame)
         self.model.fit(
             prepare_features(inner, schema, self._category_dtypes),
-            np.log1p(inner[TARGET_COLUMN]),
+            np.log1p(inner[schema.target_column]),
             eval_set=[
                 (
                     prepare_features(evaluation, schema, self._category_dtypes),
-                    np.log1p(evaluation[TARGET_COLUMN]),
+                    np.log1p(evaluation[schema.target_column]),
                 )
             ],
             categorical_feature=schema.categorical_features,
@@ -125,7 +123,7 @@ class LightGBMPriceModel:
         self.model = LGBMRegressor(**self.params)
         self.model.fit(
             prepare_features(train_frame, schema, self._category_dtypes),
-            np.log1p(train_frame[TARGET_COLUMN]),
+            np.log1p(train_frame[schema.target_column]),
             categorical_feature=schema.categorical_features,
         )
 
@@ -163,11 +161,11 @@ class XGBoostPriceModel:
         inner, evaluation = split_for_early_stopping(train_frame)
         self.model.fit(
             prepare_features(inner, schema, self._category_dtypes),
-            np.log1p(inner[TARGET_COLUMN]),
+            np.log1p(inner[schema.target_column]),
             eval_set=[
                 (
                     prepare_features(evaluation, schema, self._category_dtypes),
-                    np.log1p(evaluation[TARGET_COLUMN]),
+                    np.log1p(evaluation[schema.target_column]),
                 )
             ],
             verbose=False,
@@ -190,7 +188,7 @@ class XGBoostPriceModel:
         self.model = XGBRegressor(**self.params)
         self.model.fit(
             prepare_features(train_frame, schema, self._category_dtypes),
-            np.log1p(train_frame[TARGET_COLUMN]),
+            np.log1p(train_frame[schema.target_column]),
             verbose=False,
         )
 
