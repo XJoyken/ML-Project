@@ -6,50 +6,45 @@ from typing import Any
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .air import load_air_catalog
-from .constants import (
+from ..air import load_air_catalog
+from ..constants import (
     AIR_QUALITY_RAW_PATH,
     CRIME_RAW_PATH,
-    MLFLOW_EXPERIMENT_NAME,
     POI_SOURCE_FILES,
-    PROCESSED_DATASET_PATH,
+    RENT_MLFLOW_EXPERIMENT_NAME,
+    RENT_PROCESSED_DATASET_PATH,
 )
-from .crime import load_crime_catalog
-from .data import load_listings
-from .features import build_processed_dataset
-from .metrics import calculate_metrics
-from .models import create_model
-from .poi import load_poi_catalog
-from .tracking import log_training_run
-
-STRATIFY_BINS = 10
-
-
-def stratify_bins(target: pd.Series, n_bins: int = STRATIFY_BINS) -> pd.Series:
-    return pd.qcut(target, q=n_bins, labels=False, duplicates="drop")
+from ..crime import load_crime_catalog
+from ..metrics import calculate_metrics
+from ..models import create_model
+from ..poi import load_poi_catalog
+from ..tracking import log_training_run
+from ..train import stratify_bins
+from .data import load_rent_listings
+from .features import build_rent_processed_dataset
 
 
-def train_model(
+def train_rent_model(
     model_name: str = "lightgbm",
     *,
     ads_path: Path | None = None,
     poi_sources: dict[str, Path] | None = None,
     air_quality_path: Path | None = None,
     crime_path: Path | None = None,
-    processed_path: Path | None = PROCESSED_DATASET_PATH,
+    processed_path: Path | None = RENT_PROCESSED_DATASET_PATH,
     test_size: float = 0.2,
     random_state: int = 42,
     model_params: dict[str, object] | None = None,
     save_processed: bool = True,
     log_to_mlflow: bool = True,
-    experiment_name: str = MLFLOW_EXPERIMENT_NAME,
+    experiment_name: str = RENT_MLFLOW_EXPERIMENT_NAME,
     final: bool = False,
 ) -> dict[str, Any]:
-    listings = load_listings(ads_path=ads_path)
+    listings = load_rent_listings(ads_path=ads_path)
     poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
     air_catalog = load_air_catalog(raw_path=air_quality_path or AIR_QUALITY_RAW_PATH)
     crime_catalog = load_crime_catalog(raw_path=crime_path or CRIME_RAW_PATH)
-    processed, schema = build_processed_dataset(
+    processed, schema = build_rent_processed_dataset(
         listings,
         poi_catalog,
         air_catalog,
@@ -107,7 +102,7 @@ def train_model(
     }
 
 
-def evaluate_model(
+def evaluate_rent_model(
     model_name: str = "lightgbm",
     *,
     ads_path: Path | None = None,
@@ -119,7 +114,7 @@ def evaluate_model(
     model_params: dict[str, object] | None = None,
     final: bool = False,
 ) -> dict[str, Any]:
-    return train_model(
+    return train_rent_model(
         model_name,
         ads_path=ads_path,
         poi_sources=poi_sources,
@@ -133,3 +128,6 @@ def evaluate_model(
         log_to_mlflow=False,
         final=final,
     )
+
+
+__all__ = ["train_rent_model", "evaluate_rent_model"]

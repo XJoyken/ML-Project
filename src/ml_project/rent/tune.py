@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 import random
 import time
@@ -11,92 +10,38 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from .air import load_air_catalog
-from .constants import MLFLOW_EXPERIMENT_NAME, ROOT_DIR
-from .crime import load_crime_catalog
-from .data import load_listings
-from .features import build_processed_dataset
-from .metrics import calculate_metrics
-from .models import create_model
-from .poi import load_poi_catalog
-from .train import stratify_bins
-
-PARAM_GRIDS: dict[str, dict[str, list[Any]]] = {
-    "catboost": {
-        "iterations": [800, 1200, 1800],
-        "learning_rate": [0.03, 0.05, 0.08],
-        "depth": [6, 8, 10],
-        "l2_leaf_reg": [3.0, 5.0, 8.0],
-        "min_data_in_leaf": [20, 30, 50],
-    },
-    "lightgbm": {
-        "n_estimators": [2500, 3500],
-        "learning_rate": [0.01, 0.03],
-        "num_leaves": [255, 400],
-        "min_child_samples": [20, 30, 50],
-        "reg_lambda": [10.0, 15.0],
-    },
-    "xgboost": {
-        "n_estimators": [800, 1500, 2500],
-        "learning_rate": [0.03, 0.05, 0.08],
-        "max_depth": [6, 8, 10],
-        "min_child_weight": [10, 30, 50],
-        "reg_lambda": [1.0, 5.0, 10.0],
-    },
-}
+from ..air import load_air_catalog
+from ..constants import RENT_MLFLOW_EXPERIMENT_NAME, ROOT_DIR
+from ..crime import load_crime_catalog
+from ..poi import load_poi_catalog
+from ..train import stratify_bins
+from ..tune import (
+    PARAM_GRIDS,
+    _json_default,
+    kfold_score,
+    sample_params,
+    score_on_split,
+)
+from .data import load_rent_listings
+from .features import build_rent_processed_dataset
 
 
-def sample_params(grid: dict[str, list[Any]], rng: random.Random) -> dict[str, Any]:
-    return {key: rng.choice(values) for key, values in grid.items()}
-
-
-def prepare_dataset() -> tuple[pd.DataFrame, Any]:
-    listings = load_listings()
+def prepare_rent_dataset() -> tuple[pd.DataFrame, Any]:
+    listings = load_rent_listings()
     poi_catalog = load_poi_catalog()
     air_catalog = load_air_catalog()
     crime_catalog = load_crime_catalog()
-    return build_processed_dataset(listings, poi_catalog, air_catalog, crime_catalog)
+    return build_rent_processed_dataset(listings, poi_catalog, air_catalog, crime_catalog)
 
 
-def score_on_split(
-    model_name: str,
-    params: dict[str, Any],
-    train_frame: pd.DataFrame,
-    valid_frame: pd.DataFrame,
-    schema,
-) -> dict[str, float]:
-    model = create_model(model_name, **params)
-    model.fit(train_frame, schema)
-    preds = model.predict(valid_frame, schema)
-    return calculate_metrics(valid_frame[schema.target_column], preds)
-
-
-def kfold_score(
-    model_name: str,
-    params: dict[str, Any],
-    frame: pd.DataFrame,
-    schema,
-    n_splits: int,
-    random_state: int,
-) -> dict[str, float]:
-    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    strata = stratify_bins(frame[schema.target_column])
-    metrics_list = []
-    for train_idx, valid_idx in kf.split(frame, strata):
-        train_fold = frame.iloc[train_idx].reset_index(drop=True)
-        valid_fold = frame.iloc[valid_idx].reset_index(drop=True)
-        metrics_list.append(score_on_split(model_name, params, train_fold, valid_fold, schema))
-    return {key: float(np.mean([m[key] for m in metrics_list])) for key in metrics_list[0]}
-
-
-def tune_random(
+def tune_rent_random(
     model_name: str,
     *,
     trials: int,
     seed: int,
     experiment_name: str,
 ) -> pd.DataFrame:
-    processed, schema = prepare_dataset()
+    processed, schema = prepare_rent_dataset()
     train_frame, valid_frame = train_test_split(
         processed,
         test_size=0.2,
@@ -112,7 +57,7 @@ def tune_random(
         params = sample_params(grid, rng)
         started = time.time()
         with mlflow.start_run(run_name=f"{model_name}-trial-{trial}"):
-            mlflow.log_params({"model": model_name, "mode": "random", **params})
+            mlflow.log_params({"model": model_name, "mode": "random", "target": "rent", **params})
             metrics = score_on_split(model_name, params, train_frame, valid_frame, schema)
             mlflow.log_metrics({key: float(value) for key, value in metrics.items()})
             history.append({"trial": trial, **params, **metrics})
@@ -124,7 +69,7 @@ def tune_random(
     return pd.DataFrame(history).sort_values("mae_kzt").reset_index(drop=True)
 
 
-def tune_nested(
+def tune_rent_nested(
     model_name: str,
     *,
     trials: int,
@@ -133,7 +78,7 @@ def tune_nested(
     seed: int,
     experiment_name: str,
 ) -> pd.DataFrame:
-    processed, schema = prepare_dataset()
+    processed, schema = prepare_rent_dataset()
     grid = PARAM_GRIDS[model_name]
     rng = random.Random(seed)
     outer_kf = StratifiedKFold(n_splits=outer_splits, shuffle=True, random_state=seed)
@@ -143,18 +88,18 @@ def tune_nested(
     rows: list[dict[str, Any]] = []
     started_total = time.time()
 
-    with mlflow.start_run(run_name=f"{model_name}-nested-cv"):
+    with mlflow.start_run(run_name=f"{model_name}-rent-nested-cv"):
         mlflow.log_params(
             {
                 "model": model_name,
                 "mode": "nested-cv",
+                "target": "rent",
                 "trials_per_fold": trials,
                 "outer_splits": outer_splits,
                 "inner_splits": inner_splits,
                 "seed": seed,
             }
         )
-
         for outer_fold, (otr_idx, ote_idx) in enumerate(
             outer_kf.split(processed, outer_strata), start=1
         ):
@@ -185,14 +130,12 @@ def tune_nested(
             outer_metrics = score_on_split(
                 model_name, best["params"], outer_train, outer_test, schema
             )
-
             with mlflow.start_run(run_name=f"outer-fold-{outer_fold}", nested=True):
                 mlflow.log_params({"model": model_name, **best["params"]})
                 mlflow.log_metric("inner_cv_mae", best["inner_mae"])
                 mlflow.log_metrics(
                     {f"outer_{k}": float(v) for k, v in outer_metrics.items()}
                 )
-
             rows.append(
                 {
                     "fold": outer_fold,
@@ -214,11 +157,8 @@ def tune_nested(
             mlflow.log_metric(f"std_outer_{key}", float(history[f"outer_{key}"].std()))
 
         best_row = history.loc[history["outer_mae_kzt"].idxmin()]
-        best_params = {
-            key: best_row[key]
-            for key in PARAM_GRIDS[model_name].keys()
-        }
-        save_path = ROOT_DIR / "src" / "configs" / f"{model_name}_nested_best.json"
+        best_params = {key: best_row[key] for key in PARAM_GRIDS[model_name].keys()}
+        save_path = ROOT_DIR / "src" / "configs" / f"{model_name}_rent_nested_best.json"
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(json.dumps(best_params, indent=2, default=_json_default), encoding="utf-8")
         mlflow.log_artifact(str(save_path))
@@ -228,15 +168,7 @@ def tune_nested(
     return history
 
 
-def _json_default(value):
-    if isinstance(value, (np.integer,)):
-        return int(value)
-    if isinstance(value, (np.floating,)):
-        return float(value)
-    return str(value)
-
-
-def tune_model(
+def tune_rent_model(
     model_name: str,
     *,
     mode: str = "random",
@@ -244,17 +176,17 @@ def tune_model(
     outer_splits: int = 5,
     inner_splits: int = 3,
     seed: int = 42,
-    experiment_name: str = MLFLOW_EXPERIMENT_NAME + "-tune",
+    experiment_name: str = RENT_MLFLOW_EXPERIMENT_NAME + "-tune",
 ) -> pd.DataFrame:
     if mode == "random":
-        return tune_random(
+        return tune_rent_random(
             model_name,
             trials=trials,
             seed=seed,
             experiment_name=experiment_name,
         )
     if mode == "nested":
-        return tune_nested(
+        return tune_rent_nested(
             model_name,
             trials=trials,
             outer_splits=outer_splits,
@@ -265,36 +197,4 @@ def tune_model(
     raise ValueError(f"Unknown tune mode '{mode}'. Use 'random' or 'nested'.")
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Hyperparameter search.")
-    parser.add_argument("--model", required=True, choices=list(PARAM_GRIDS.keys()))
-    parser.add_argument("--mode", default="random", choices=["random", "nested"])
-    parser.add_argument("--trials", type=int, default=15)
-    parser.add_argument("--outer-splits", type=int, default=5)
-    parser.add_argument("--inner-splits", type=int, default=3)
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args(argv)
-
-    history = tune_model(
-        args.model,
-        mode=args.mode,
-        trials=args.trials,
-        outer_splits=args.outer_splits,
-        inner_splits=args.inner_splits,
-        seed=args.seed,
-    )
-    print()
-    if args.mode == "random":
-        print("Top 5 by MAE:")
-        print(history.head(5).round(4).to_string(index=False))
-    else:
-        print("Per outer fold:")
-        print(history.round(4).to_string(index=False))
-        print()
-        for key in ["outer_mae_kzt", "outer_mape", "outer_r2"]:
-            print(f"{key}: mean={history[key].mean():.4f}, std={history[key].std():.4f}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+__all__ = ["prepare_rent_dataset", "tune_rent_model"]

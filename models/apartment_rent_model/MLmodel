@@ -1,0 +1,154 @@
+artifact_path: file:D:/Code/2-course/ML/ml-project-git/ML-Project/mlruns/5/models/m-2f4128ffc457457baba334cfea5c5cd5/artifacts
+flavors:
+  lightgbm:
+    code: null
+    data: model.pkl
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMRegressor
+    serialization_format: cloudpickle
+    skops_trusted_types: null
+  python_function:
+    data: model.pkl
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.14.3
+metadata:
+  categorical_features:
+  - district
+  - house_type
+  - condition
+  - bathroom_type
+  - furnished
+  numeric_features:
+  - area_m2
+  - rooms
+  - lat
+  - lon
+  - year_built
+  - floor_current
+  - floors_total
+  - ceiling_height_m
+  - photo_count
+  - has_photo
+  - has_complex_id
+  - has_microdistrict
+  - complex_listing_count
+  - floor_ratio
+  - building_age
+  - area_per_room
+  - is_first_floor
+  - is_last_floor
+  - dist_to_center_km
+  - bus_stops_count_1000m
+  - bus_stops_count_300m
+  - bus_stops_count_500m
+  - bus_stops_mean_dist_km_3
+  - bus_stops_mean_dist_km_5
+  - bus_stops_nearest_dist_m
+  - clinics_count_1000m
+  - clinics_count_300m
+  - clinics_count_500m
+  - clinics_mean_dist_km_3
+  - clinics_mean_dist_km_5
+  - clinics_nearest_dist_m
+  - dentistry_count_1000m
+  - dentistry_count_300m
+  - dentistry_count_500m
+  - dentistry_mean_dist_km_3
+  - dentistry_mean_dist_km_5
+  - dentistry_nearest_dist_m
+  - energy_count_1000m
+  - energy_count_300m
+  - energy_count_500m
+  - energy_mean_dist_km_3
+  - energy_mean_dist_km_5
+  - energy_nearest_dist_m
+  - fitness_count_1000m
+  - fitness_count_300m
+  - fitness_count_500m
+  - fitness_mean_dist_km_3
+  - fitness_mean_dist_km_5
+  - fitness_nearest_dist_m
+  - hospitals_count_1000m
+  - hospitals_count_300m
+  - hospitals_count_500m
+  - hospitals_mean_dist_km_3
+  - hospitals_mean_dist_km_5
+  - hospitals_nearest_dist_m
+  - kindergartens_count_1000m
+  - kindergartens_count_300m
+  - kindergartens_count_500m
+  - kindergartens_mean_dist_km_3
+  - kindergartens_mean_dist_km_5
+  - kindergartens_nearest_dist_m
+  - medcenters_count_1000m
+  - medcenters_count_300m
+  - medcenters_count_500m
+  - medcenters_mean_dist_km_3
+  - medcenters_mean_dist_km_5
+  - medcenters_nearest_dist_m
+  - metro_count_1000m
+  - metro_count_300m
+  - metro_count_500m
+  - metro_mean_dist_km_3
+  - metro_mean_dist_km_5
+  - metro_nearest_dist_m
+  - parks_count_1000m
+  - parks_count_300m
+  - parks_count_500m
+  - parks_mean_dist_km_3
+  - parks_mean_dist_km_5
+  - parks_nearest_dist_m
+  - polyclinics_count_1000m
+  - polyclinics_count_300m
+  - polyclinics_count_500m
+  - polyclinics_mean_dist_km_3
+  - polyclinics_mean_dist_km_5
+  - polyclinics_nearest_dist_m
+  - restaurants_coffee_count_1000m
+  - restaurants_coffee_count_300m
+  - restaurants_coffee_count_500m
+  - restaurants_coffee_mean_dist_km_3
+  - restaurants_coffee_mean_dist_km_5
+  - restaurants_coffee_nearest_dist_m
+  - schools_count_1000m
+  - schools_count_300m
+  - schools_count_500m
+  - schools_mean_dist_km_3
+  - schools_mean_dist_km_5
+  - schools_nearest_dist_m
+  - supermarkets_count_1000m
+  - supermarkets_count_300m
+  - supermarkets_count_500m
+  - supermarkets_mean_dist_km_3
+  - supermarkets_mean_dist_km_5
+  - supermarkets_nearest_dist_m
+  - transport_count_1000m
+  - transport_count_300m
+  - transport_count_500m
+  - transport_mean_dist_km_3
+  - transport_mean_dist_km_5
+  - transport_nearest_dist_m
+  - universities_count_1000m
+  - universities_count_300m
+  - universities_count_500m
+  - universities_mean_dist_km_3
+  - universities_mean_dist_km_5
+  - universities_nearest_dist_m
+  - air_pm25_cold_night
+  - air_pm25_cold_day
+  - air_pm25_warm_night
+  - air_pm25_warm_day
+  - air_nearest_dist_m
+  - district_crime_count
+  - district_crime_index
+  target_column: target_rent_kzt
+mlflow_version: 3.12.0
+model_id: m-2f4128ffc457457baba334cfea5c5cd5
+model_size_bytes: 1941849
+model_uuid: m-2f4128ffc457457baba334cfea5c5cd5
+prompts: null
+run_id: 22357f44da504ae6b2eafa75a0dbbd54
+utc_time_created: '2026-05-13 03:15:32.474307'

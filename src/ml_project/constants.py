@@ -41,6 +41,49 @@ CRIME_REFERENCE_YEAR = 2025
 MACRO_INFLATION_PATH = DATA_DIR / "cleaned_macroeconomics.csv"
 MACRO_MARKET_PATH = DATA_DIR / "cleaned_real_estate_market.csv"
 
+# --- Rent (Model 3) pipeline -------------------------------------------------
+RENT_DATASET_PATH = DATA_DIR / "ads_rent.csv"
+RENT_PROCESSED_DATASET_PATH = PROCESSED_DIR / "ads_rent_v1.csv"
+DEFAULT_APARTMENT_RENT_MODEL_DIR = MODELS_DIR / "apartment_rent_model"
+RENT_MLFLOW_EXPERIMENT_NAME = "almaty-apartment-rent"
+
+RENT_TARGET_COLUMN = "target_rent_kzt"
+
+RENT_ADS_COLUMNS = [
+    "listing_id",
+    "listing_category_alias",
+    "listing_price_kzt",
+    "listing_square_m2",
+    "listing_rooms",
+    "location_lat",
+    "location_lon",
+    "address_district",
+    "address_microdistrict",
+    "listing_complex_id",
+    "summary_Год_постройки",
+    "summary_Этаж",
+    "summary_Тип_дома",
+    "summary_Состояние_квартиры",
+    "summary_Высота_потолков",
+    "parameter_Санузел",
+    "summary_Квартира_меблирована",
+    "listing_has_photo",
+    "listing_photo_count",
+    "listing_description",
+]
+
+RENT_CATEGORICAL_FEATURES = [
+    "district",
+    "house_type",
+    "condition",
+    "bathroom_type",
+    "furnished",
+]
+
+# Rent monthly KZT/m² typical range. 1k-30k covers the bulk; outliers trimmed.
+RENT_PPM_LOWER_QUANTILE = 0.005
+RENT_PPM_UPPER_QUANTILE = 0.995
+
 ADS_COLUMNS = [
     "listing_id",
     "listing_category_alias",
