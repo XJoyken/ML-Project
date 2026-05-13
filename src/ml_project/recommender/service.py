@@ -1,31 +1,87 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from ml_project.constants import PROCESSED_DATASET_PATH
+from ml_project.constants import PROCESSED_DATASET_PATH, POI_SOURCE_FILES, AIR_QUALITY_RAW_PATH, DEFAULT_EXPLANATION_CATEGORIES
 from ml_project.data import load_listings
+from ml_project.poi import load_poi_catalog
+from ml_project.air import load_air_catalog
+from ml_project.thresholds import classify_pm25, score_air_tier
+
+from .mmr import build_similarity_matrix, mmr_select
+from .scoring import (
+    HARD_WEIGHT_THRESHOLD,
+    CategoricalMatch,
+    NumericMatch,
+    NumericPreference,
+    categorical_score,
+    hard_filter_passes,
+    score_numeric,
+)
 
 CATEGORICAL_COLUMNS = ("district", "house_type", "condition", "bathroom_type")
-DEFAULT_LIMIT = 5
+BOOLEAN_FEATURES = (
+    "has_complex_id",
+    "has_photo",
+    "has_microdistrict",
+    "is_first_floor",
+    "is_last_floor",
+)
+CANDIDATE_POOL_MULTIPLIER = 8
+MIN_CANDIDATE_POOL = 30
+DIVERSITY_FEATURES = ("lat", "lon", "target_price_kzt", "rooms")
+
+# Air priority is an additive tiebreaker, never a feature with its own weight.
+# Max swing is ±AIR_BONUS_HALF_RANGE on the [0, 1] score, so it can only re-rank
+# near-tied candidates and cannot override legitimate preference mismatches.
+AIR_BONUS_HALF_RANGE = 0.05  # final_score += (air_score - 0.5) * (2 * 0.05) at most
 
 
 @dataclass(slots=True)
-class QueryVector:
-    numeric_values: dict[str, float]
-    numeric_preferences: dict[str, str]
-    numeric_weights: dict[str, float]
-    categorical_values: dict[str, str]
-    categorical_weights: dict[str, float]
+class QueryTarget:
+    feature: str
+    preference: NumericPreference | None
+    value: Any
+    weight: float
+    evidence: str | None = None
+    kind: str = "numeric"  # numeric | categorical | boolean
 
 
-class KnnRecommendationService:
+@dataclass(slots=True)
+class QueryPlan:
+    numeric_targets: list[QueryTarget] = field(default_factory=list)
+    categorical_targets: list[QueryTarget] = field(default_factory=list)
+    boolean_targets: list[QueryTarget] = field(default_factory=list)
+    excluded_districts: list[str] = field(default_factory=list)
+    intent: str = "unknown"
+
+    def is_empty(self) -> bool:
+        # An exclusion alone is not enough to recommend — the user must give at least
+        # one positive preference. Otherwise the recommender has nothing to score by.
+        return not (self.numeric_targets or self.categorical_targets or self.boolean_targets)
+
+
+@dataclass(slots=True)
+class ScoredCandidate:
+    index: int
+    total_score: float
+    base_score: float
+    weight_sum: float
+    numeric_matches: list[NumericMatch]
+    categorical_matches: list[CategoricalMatch]
+    hard_failures: list[str]
+    air_pm25_cold_day: float | None = None
+    air_pm25_warm_day: float | None = None
+    air_score: float | None = None
+    air_bonus: float = 0.0
+
+
+class RecommendationService:
     def __init__(
         self,
         *,
@@ -36,7 +92,7 @@ class KnnRecommendationService:
         self.listings = load_listings()
         if len(self.features) != len(self.listings):
             raise ValueError(
-                "Processed feature matrix and listing metadata must have the same row count: "
+                f"Feature matrix and listings disagree on row count: "
                 f"{len(self.features)} != {len(self.listings)}"
             )
 
@@ -46,208 +102,406 @@ class KnnRecommendationService:
         self.categorical_columns = [
             column for column in CATEGORICAL_COLUMNS if column in self.features.columns
         ]
-        self.numeric_means = self.features[self.numeric_columns].mean(numeric_only=True)
-        self.scaler = StandardScaler()
-        numeric_matrix = self.scaler.fit_transform(
-            self.features[self.numeric_columns].fillna(self.numeric_means)
-        )
+        self.diversity_columns = [c for c in DIVERSITY_FEATURES if c in self.features.columns]
+        self._diversity_matrix = self._build_diversity_matrix()
+        
+        self.poi_catalog = load_poi_catalog(POI_SOURCE_FILES)
+        self.air_catalog = load_air_catalog(AIR_QUALITY_RAW_PATH)
+        self.air_features = self.air_catalog.build_feature_frame(self.features)
 
-        self.encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
-        categorical_matrix = self.encoder.fit_transform(
-            self.features[self.categorical_columns].fillna("unknown").astype(str)
-        )
-
-        self.matrix = np.hstack([numeric_matrix, categorical_matrix]).astype(np.float32)
-
-    def recommend(self, features: Any, *, limit: int = DEFAULT_LIMIT) -> list[dict[str, Any]]:
-        limit = max(1, min(int(limit), len(self.features)))
-        query = self._build_query(features)
-        if not query.numeric_values and not query.categorical_values:
-            raise ValueError("Prompt did not map to any supported recommender features.")
-        query_matrix, selected_indices, weights = self._vectorize_query(query)
-        if not selected_indices:
-            raise ValueError("Prompt did not map to known recommender feature columns.")
-
-        candidate_indices = self._candidate_indices(query, limit)
-        candidate_matrix = self.matrix[candidate_indices][:, selected_indices] * weights
-        selected_query = query_matrix[:, selected_indices] * weights
-
-        knn = NearestNeighbors(metric="cosine", algorithm="brute")
-        knn.fit(candidate_matrix)
-        distances, local_indices = knn.kneighbors(
-            selected_query,
-            n_neighbors=min(limit, len(candidate_indices)),
-        )
-        indices = candidate_indices[local_indices[0]]
-
-        return [
-            self._build_item(int(index), float(1.0 - distance), query)
-            for distance, index in zip(distances[0], indices, strict=True)
-        ]
-
-    def _build_query(self, features: Any) -> QueryVector:
-        numeric_values: dict[str, float] = {}
-        numeric_preferences: dict[str, str] = {}
-        numeric_weights: dict[str, float] = {}
-        categorical_values: dict[str, str] = {}
-        categorical_weights: dict[str, float] = {}
-
-        for target in getattr(features, "numeric_targets", []):
-            feature = str(target.feature)
-            if feature in self.numeric_columns:
-                numeric_values[feature] = float(target.value)
-                numeric_preferences[feature] = str(target.preference)
-                numeric_weights[feature] = float(target.weight)
-
-        for target in getattr(features, "boolean_targets", []):
-            feature = str(target.feature)
-            if feature in self.numeric_columns:
-                numeric_values[feature] = 1.0 if bool(target.value) else 0.0
-                numeric_preferences[feature] = "equal"
-                numeric_weights[feature] = float(target.weight)
-
-        for target in getattr(features, "categorical_targets", []):
-            feature = str(target.feature)
-            if feature in self.categorical_columns:
-                categorical_values[feature] = str(target.value)
-                categorical_weights[feature] = float(target.weight)
-
-        for location in getattr(features, "location_preferences", []):
-            if (
-                str(location.kind) == "district"
-                and str(location.preference) == "include"
-                and "district" in self.categorical_columns
-            ):
-                categorical_values["district"] = str(location.value)
-                categorical_weights["district"] = float(location.weight)
-
-        return QueryVector(
-            numeric_values=numeric_values,
-            numeric_preferences=numeric_preferences,
-            numeric_weights=numeric_weights,
-            categorical_values=categorical_values,
-            categorical_weights=categorical_weights,
-        )
-
-    def _vectorize_query(self, query: QueryVector) -> tuple[np.ndarray, list[int], np.ndarray]:
-        numeric_row = self.numeric_means.to_frame().T
-        for column, value in query.numeric_values.items():
-            numeric_row[column] = value
-        numeric_matrix = self.scaler.transform(numeric_row[self.numeric_columns])
-
-        categorical_matrix = np.zeros(
-            (1, sum(len(categories) for categories in self.encoder.categories_)),
-            dtype=np.float32,
-        )
-        selected_indices: list[int] = []
-        weights: list[float] = []
-
-        for column in query.numeric_values:
-            selected_indices.append(self.numeric_columns.index(column))
-            weights.append(query.numeric_weights.get(column, 1.0))
-
-        categorical_offset = len(self.numeric_columns)
-        offset = 0
-        for column, categories in zip(
-            self.categorical_columns,
-            self.encoder.categories_,
-            strict=True,
-        ):
-            value = query.categorical_values.get(column)
-            if value is not None:
-                matches = np.where(categories == value)[0]
-                if len(matches):
-                    categorical_matrix[0, offset + int(matches[0])] = 1.0
-                    group_indices = list(
-                        range(
-                            categorical_offset + offset,
-                            categorical_offset + offset + len(categories),
-                        )
-                    )
-                    selected_indices.extend(group_indices)
-                    weights.extend([query.categorical_weights.get(column, 1.0)] * len(group_indices))
-            offset += len(categories)
-
-        matrix = np.hstack([numeric_matrix, categorical_matrix]).astype(np.float32)
-        return matrix, selected_indices, np.array(weights, dtype=np.float32)
-
-    def _candidate_indices(self, query: QueryVector, limit: int) -> np.ndarray:
-        mask = pd.Series(True, index=self.features.index)
-
-        for feature, value in query.numeric_values.items():
-            preference = query.numeric_preferences.get(feature)
-            if feature == "target_price_kzt" and preference == "at_most":
-                mask &= self.features[feature].le(value)
-            elif feature == "target_price_kzt" and preference == "at_least":
-                mask &= self.features[feature].ge(value)
-            elif feature == "rooms" and preference == "equal":
-                mask &= self.features[feature].round().eq(round(value))
-            elif feature.startswith("has_") or feature.startswith("is_"):
-                mask &= self.features[feature].round().eq(round(value))
-
-        for feature, value in query.categorical_values.items():
-            mask &= self.features[feature].astype(str).eq(value)
-
-        if int(mask.sum()) >= limit:
-            return np.flatnonzero(mask.to_numpy())
-        return np.arange(len(self.features))
-
-    def _build_item(
+    def recommend(
         self,
-        index: int,
-        similarity: float,
-        query: QueryVector,
+        features: Any,
+        *,
+        limit: int = 5,
+        mmr_lambda: float = 0.7,
+        prioritize_air_quality: bool = False,
     ) -> dict[str, Any]:
-        listing = self.listings.iloc[index]
-        feature_row = self.features.iloc[index]
+        limit = max(1, min(int(limit), len(self.features)))
+        plan = self._build_query_plan(features)
+        if plan.is_empty():
+            raise ValueError("Prompt did not map to any supported recommender features.")
+
+        candidate_mask = self._hard_filter_mask(plan)
+        candidate_indices = np.flatnonzero(candidate_mask.to_numpy())
+
+        if len(candidate_indices) < limit:
+            # Fall back to full pool if hard filters were too restrictive.
+            relaxed_mask = self._hard_filter_mask(plan, drop_hard=True)
+            candidate_indices = np.flatnonzero(relaxed_mask.to_numpy())
+
+        scored = self._score_candidates(plan, candidate_indices, prioritize_air_quality)
+        if not scored:
+            raise ValueError("No candidates left after scoring.")
+
+        scored.sort(key=lambda c: c.total_score, reverse=True)
+        pool_size = max(MIN_CANDIDATE_POOL, limit * CANDIDATE_POOL_MULTIPLIER)
+        top_pool = scored[:pool_size]
+
+        diversified = self._diversify(top_pool, k=limit, lambda_=mmr_lambda)
         return {
-            "listing_id": optional_str(listing.get("listing_id")),
-            "similarity": round(similarity, 6),
-            "price_kzt": optional_float(listing.get("target_price_kzt")),
-            "rooms": optional_float(listing.get("rooms")),
-            "area_m2": optional_float(listing.get("area_m2")),
-            "district": optional_str(listing.get("district")),
-            "microdistrict": optional_str(listing.get("microdistrict")),
-            "lat": optional_float(listing.get("lat")),
-            "lon": optional_float(listing.get("lon")),
-            "reasons": self._build_reasons(feature_row, query),
+            "intent": plan.intent,
+            "limit": limit,
+            "matched_candidates": len(candidate_indices),
+            "items": [self._build_item(candidate) for candidate in diversified],
+            "plan": self._plan_payload(plan),
+            "air_priority_active": bool(prioritize_air_quality),
         }
 
-    def _build_reasons(self, row: pd.Series, query: QueryVector) -> list[str]:
-        reasons = []
-        for feature, target_value in query.numeric_values.items():
-            actual_value = optional_float(row.get(feature))
-            if actual_value is not None:
-                reasons.append(format_numeric_reason(feature, actual_value, target_value))
+    def _build_query_plan(self, features: Any) -> QueryPlan:
+        plan = QueryPlan(intent=str(getattr(features, "intent", "unknown") or "unknown"))
 
-        for feature, target_value in query.categorical_values.items():
-            actual_value = optional_str(row.get(feature))
-            if actual_value is not None:
-                reasons.append(f"{feature}: {actual_value} похож на запрос {target_value}")
+        for target in getattr(features, "numeric_targets", []) or []:
+            feature = str(target.feature)
+            if feature not in self.numeric_columns:
+                continue
+            plan.numeric_targets.append(
+                QueryTarget(
+                    feature=feature,
+                    preference=str(target.preference),
+                    value=float(target.value),
+                    weight=float(target.weight),
+                    evidence=getattr(target, "evidence", None),
+                    kind="numeric",
+                )
+            )
 
-        return reasons[:5]
+        for target in getattr(features, "boolean_targets", []) or []:
+            feature = str(target.feature)
+            if feature not in self.numeric_columns:
+                continue
+            plan.boolean_targets.append(
+                QueryTarget(
+                    feature=feature,
+                    preference="equal",
+                    value=1.0 if bool(target.value) else 0.0,
+                    weight=float(target.weight),
+                    evidence=getattr(target, "evidence", None),
+                    kind="boolean",
+                )
+            )
+
+        for target in getattr(features, "categorical_targets", []) or []:
+            feature = str(target.feature)
+            if feature not in self.categorical_columns:
+                continue
+            plan.categorical_targets.append(
+                QueryTarget(
+                    feature=feature,
+                    preference=None,
+                    value=str(target.value),
+                    weight=float(target.weight),
+                    evidence=getattr(target, "evidence", None),
+                    kind="categorical",
+                )
+            )
+
+        for location in getattr(features, "location_preferences", []) or []:
+            if str(location.kind) != "district" or "district" not in self.categorical_columns:
+                continue
+            value = str(location.value).strip()
+            if not value:
+                continue
+            if str(location.preference) == "include":
+                plan.categorical_targets.append(
+                    QueryTarget(
+                        feature="district",
+                        preference=None,
+                        value=value,
+                        weight=float(location.weight),
+                        evidence=getattr(location, "evidence", None),
+                        kind="categorical",
+                    )
+                )
+            elif str(location.preference) == "exclude":
+                plan.excluded_districts.append(value)
+        return plan
+
+    def _hard_filter_mask(self, plan: QueryPlan, *, drop_hard: bool = False) -> pd.Series:
+        mask = pd.Series(True, index=self.features.index)
+
+        # District exclusions are ALWAYS hard — even when the rest of the filters
+        # are relaxed for graceful degradation, we never surface listings the user
+        # explicitly rejected.
+        if plan.excluded_districts and "district" in self.categorical_columns:
+            excluded_lower = {d.strip().lower() for d in plan.excluded_districts if d.strip()}
+            if excluded_lower:
+                column = self.features["district"].astype("string").str.lower()
+                mask &= ~column.isin(excluded_lower)
+
+        if drop_hard:
+            return mask
+
+        for target in plan.numeric_targets + plan.boolean_targets:
+            if target.weight < HARD_WEIGHT_THRESHOLD:
+                continue
+            actual = self.features[target.feature].to_numpy(dtype=float)
+            keep = np.array(
+                [
+                    hard_filter_passes(
+                        actual=value,
+                        target=float(target.value),
+                        preference=target.preference,  # type: ignore[arg-type]
+                        feature=target.feature,
+                    )
+                    for value in actual
+                ]
+            )
+            mask &= pd.Series(keep, index=self.features.index)
+
+        for target in plan.categorical_targets:
+            if target.weight < HARD_WEIGHT_THRESHOLD:
+                continue
+            column = self.features[target.feature].astype("string").str.lower()
+            mask &= column.eq(str(target.value).lower())
+        return mask
+
+    def _score_candidates(
+        self,
+        plan: QueryPlan,
+        indices: np.ndarray,
+        prioritize_air_quality: bool = False,
+    ) -> list[ScoredCandidate]:
+        results: list[ScoredCandidate] = []
+        all_targets = plan.numeric_targets + plan.boolean_targets
+        weight_sum = sum(target.weight for target in all_targets) + sum(
+            target.weight for target in plan.categorical_targets
+        )
+        if weight_sum <= 0:
+            weight_sum = 1.0
+
+        feature_arrays = {
+            target.feature: self.features[target.feature].to_numpy(dtype=float)
+            for target in all_targets
+        }
+        categorical_arrays = {
+            target.feature: self.features[target.feature].astype("string").to_numpy()
+            for target in plan.categorical_targets
+        }
+
+        for index in indices:
+            numeric_matches: list[NumericMatch] = []
+            categorical_matches: list[CategoricalMatch] = []
+            score_sum = 0.0
+            hard_failures: list[str] = []
+
+            for target in all_targets:
+                actual_value = float(feature_arrays[target.feature][index])
+                feature_score = score_numeric(
+                    actual=actual_value,
+                    target=float(target.value),
+                    preference=target.preference,  # type: ignore[arg-type]
+                    feature=target.feature,
+                )
+                passes_hard = hard_filter_passes(
+                    actual=actual_value,
+                    target=float(target.value),
+                    preference=target.preference,  # type: ignore[arg-type]
+                    feature=target.feature,
+                )
+                if target.weight >= HARD_WEIGHT_THRESHOLD and not passes_hard:
+                    hard_failures.append(target.feature)
+                score_sum += feature_score * target.weight
+                numeric_matches.append(
+                    NumericMatch(
+                        feature=target.feature,
+                        preference=target.preference,  # type: ignore[arg-type]
+                        target=float(target.value),
+                        actual=actual_value,
+                        weight=target.weight,
+                        score=feature_score,
+                        hard_failed=not passes_hard and target.weight >= HARD_WEIGHT_THRESHOLD,
+                    )
+                )
+
+            for target in plan.categorical_targets:
+                actual_value = categorical_arrays[target.feature][index]
+                actual_text = None if pd.isna(actual_value) else str(actual_value)
+                cat_score = categorical_score(actual_text, str(target.value))
+                if target.weight >= HARD_WEIGHT_THRESHOLD and cat_score < 1.0:
+                    hard_failures.append(target.feature)
+                score_sum += cat_score * target.weight
+                categorical_matches.append(
+                    CategoricalMatch(
+                        feature=target.feature,
+                        target=str(target.value),
+                        actual=actual_text,
+                        weight=target.weight,
+                        score=cat_score,
+                        hard_failed=cat_score < 1.0 and target.weight >= HARD_WEIGHT_THRESHOLD,
+                    )
+                )
+
+            base_score = score_sum / weight_sum
+
+            pm25_cold = float(self.air_features["air_pm25_cold_day"].iloc[index])
+            pm25_warm = float(self.air_features["air_pm25_warm_day"].iloc[index])
+            air_score: float | None = None
+            air_bonus = 0.0
+            if not np.isnan(pm25_cold):
+                tier = classify_pm25(pm25_cold)
+                air_score = score_air_tier(tier)
+            if prioritize_air_quality and air_score is not None:
+                # Tiebreaker only: a perfect-air listing gets +AIR_BONUS_HALF_RANGE,
+                # a very polluted one gets -AIR_BONUS_HALF_RANGE. The 0.1 total swing
+                # cannot promote a 0.7-score candidate above a 0.9-score one.
+                air_bonus = (air_score - 0.5) * 2.0 * AIR_BONUS_HALF_RANGE
+
+            total_score = base_score + air_bonus
+            results.append(
+                ScoredCandidate(
+                    index=int(index),
+                    total_score=float(total_score),
+                    base_score=float(base_score),
+                    weight_sum=float(weight_sum),
+                    numeric_matches=numeric_matches,
+                    categorical_matches=categorical_matches,
+                    hard_failures=hard_failures,
+                    air_pm25_cold_day=None if np.isnan(pm25_cold) else float(pm25_cold),
+                    air_pm25_warm_day=None if np.isnan(pm25_warm) else float(pm25_warm),
+                    air_score=air_score,
+                    air_bonus=float(air_bonus),
+                )
+            )
+        return results
+
+    def _diversify(
+        self,
+        candidates: list[ScoredCandidate],
+        *,
+        k: int,
+        lambda_: float,
+    ) -> list[ScoredCandidate]:
+        if len(candidates) <= k:
+            return candidates
+        scores = np.array([c.total_score for c in candidates], dtype=float)
+        pool_indices = [c.index for c in candidates]
+        diversity_subset = self._diversity_matrix[pool_indices]
+        similarity = build_similarity_matrix(diversity_subset)
+        chosen = mmr_select(
+            scores=scores,
+            similarity_matrix=similarity,
+            k=k,
+            lambda_=lambda_,
+        )
+        return [candidates[i] for i in chosen]
+
+    def _build_diversity_matrix(self) -> np.ndarray:
+        if not self.diversity_columns:
+            return np.zeros((len(self.features), 1), dtype=np.float32)
+        raw = self.features[self.diversity_columns].to_numpy(dtype=float)
+        raw = np.nan_to_num(raw, nan=0.0)
+        means = raw.mean(axis=0, keepdims=True)
+        stds = raw.std(axis=0, keepdims=True)
+        stds = np.where(stds == 0, 1.0, stds)
+        standardised = (raw - means) / stds
+        return standardised.astype(np.float32)
+
+    def _build_item(self, candidate: ScoredCandidate) -> dict[str, Any]:
+        listing = self.listings.iloc[candidate.index]
+        lat = _optional_float(listing.get("lat"))
+        lon = _optional_float(listing.get("lon"))
+
+        nearby_pois = []
+        nearest_air = None
+        if lat is not None and lon is not None:
+            nearby_pois = self.poi_catalog.nearest_many(lat=lat, lon=lon, categories=DEFAULT_EXPLANATION_CATEGORIES)
+            nearest_air = self.air_catalog.nearest_for(lat=lat, lon=lon)
+
+        return {
+            "listing_id": _optional_str(listing.get("listing_id")),
+            "match_score": round(candidate.total_score, 4),
+            "base_score": round(candidate.base_score, 4),
+            "air_bonus": round(candidate.air_bonus, 4),
+            "air_score": (
+                None if candidate.air_score is None else round(candidate.air_score, 4)
+            ),
+            "air_pm25_cold_day": candidate.air_pm25_cold_day,
+            "air_pm25_warm_day": candidate.air_pm25_warm_day,
+            "price_kzt": _optional_float(listing.get("target_price_kzt")),
+            "rooms": _optional_float(listing.get("rooms")),
+            "area_m2": _optional_float(listing.get("area_m2")),
+            "district": _optional_str(listing.get("district")),
+            "microdistrict": _optional_str(listing.get("microdistrict")),
+            "lat": lat,
+            "lon": lon,
+            "hard_failures": list(candidate.hard_failures),
+            "matches": [
+                _numeric_match_payload(match)
+                for match in candidate.numeric_matches
+            ]
+            + [
+                _categorical_match_payload(match)
+                for match in candidate.categorical_matches
+            ],
+            "description": _optional_str(listing.get("description")),
+            "nearby_pois": nearby_pois,
+            "nearest_air_sensor": nearest_air,
+        }
+
+    def _plan_payload(self, plan: QueryPlan) -> dict[str, Any]:
+        return {
+            "intent": plan.intent,
+            "numeric_targets": [
+                {
+                    "feature": t.feature,
+                    "preference": t.preference,
+                    "value": t.value,
+                    "weight": t.weight,
+                    "evidence": t.evidence,
+                }
+                for t in plan.numeric_targets + plan.boolean_targets
+            ],
+            "categorical_targets": [
+                {
+                    "feature": t.feature,
+                    "value": t.value,
+                    "weight": t.weight,
+                    "evidence": t.evidence,
+                }
+                for t in plan.categorical_targets
+            ],
+            "excluded_districts": list(plan.excluded_districts),
+        }
 
 
-def optional_float(value: Any) -> float | None:
+def _numeric_match_payload(match: NumericMatch) -> dict[str, Any]:
+    return {
+        "kind": "numeric",
+        "feature": match.feature,
+        "preference": match.preference,
+        "target": match.target,
+        "actual": match.actual,
+        "weight": match.weight,
+        "score": round(match.score, 4),
+        "hard_failed": match.hard_failed,
+    }
+
+
+def _categorical_match_payload(match: CategoricalMatch) -> dict[str, Any]:
+    return {
+        "kind": "categorical",
+        "feature": match.feature,
+        "target": match.target,
+        "actual": match.actual,
+        "weight": match.weight,
+        "score": round(match.score, 4),
+        "hard_failed": match.hard_failed,
+    }
+
+
+def _optional_float(value: Any) -> float | None:
     if value is None or pd.isna(value):
         return None
     return float(value)
 
 
-def optional_str(value: Any) -> str | None:
+def _optional_str(value: Any) -> str | None:
     if value is None or pd.isna(value):
         return None
-    return str(value)
+    text = str(value).strip()
+    return text or None
 
 
-def format_numeric_reason(feature: str, actual_value: float, target_value: float) -> str:
-    if feature.endswith("_nearest_dist_m"):
-        label = feature.removesuffix("_nearest_dist_m")
-        return f"{label}: {actual_value:.0f} м при запросе около {target_value:.0f} м"
-    if feature.endswith("_count_500m") or feature.endswith("_count_1000m"):
-        return f"{feature}: {actual_value:.0f} при запросе {target_value:.0f}"
-    if feature == "target_price_kzt":
-        return f"цена: {actual_value:,.0f} KZT при запросе {target_value:,.0f} KZT"
-    if feature == "has_complex_id":
-        return "есть ЖК" if actual_value >= 0.5 else "без ЖК"
-    return f"{feature}: {actual_value:.2f} при запросе {target_value:.2f}"
+# Backwards-compatible alias (older imports still reference this name).
+KnnRecommendationService = RecommendationService

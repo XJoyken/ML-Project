@@ -33,12 +33,22 @@ class FeatureExtractionResponse(BaseModel):
 class RecommendationRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
     limit: int = Field(default=5, ge=1, le=20)
+    language: Literal["ru", "en"] = Field(default="ru")
+    use_llm: bool | None = Field(default=None)
+    mmr_lambda: float = Field(default=0.7, ge=0.0, le=1.0)
+    prioritize_air_quality: bool = Field(default=False)
 
 
 class RecommendationResponse(BaseModel):
     model: str
     features: ExtractedRecommendationFeatures
     items: list[dict[str, Any]]
+    plan: dict[str, Any]
+    summary: str
+    source: Literal["gemini", "fallback"]
+    fallback_reason_code: str | None = None
+    fallback_reason: str | None = None
+    matched_candidates: int
 
 
 class ApartmentEvaluationRequest(BaseModel):
@@ -63,7 +73,12 @@ def get_feature_extractor() -> GeminiFeatureExtractor:
 @lru_cache
 def get_recommender():
     service_module = import_module("ml_project.recommender.service")
-    return service_module.KnnRecommendationService()
+    return service_module.RecommendationService()
+
+
+@lru_cache
+def get_recommendation_narrative():
+    return import_module("ml_project.recommender.narrative")
 
 
 @lru_cache
@@ -97,19 +112,49 @@ def recommend_listings(
     request: RecommendationRequest,
     extractor: GeminiFeatureExtractor = Depends(get_feature_extractor),
     recommender=Depends(get_recommender),
+    narrative_module=Depends(get_recommendation_narrative),
 ) -> RecommendationResponse:
     try:
         features = extractor.extract(request.prompt)
-        items = recommender.recommend(features, limit=request.limit)
+        result = recommender.recommend(
+            features,
+            limit=request.limit,
+            mmr_lambda=request.mmr_lambda,
+            prioritize_air_quality=request.prioritize_air_quality,
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=502, detail=f"Recommendation input is invalid: {exc}") from exc
+        raise HTTPException(status_code=400, detail=f"Recommendation input is invalid: {exc}") from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Recommendation failed: {exc}") from exc
+
+    narrative = narrative_module.generate(
+        plan_payload=result["plan"],
+        items=result["items"],
+        language=request.language,
+        use_llm=request.use_llm,
+        prioritize_air_quality=request.prioritize_air_quality,
+    )
+    item_explanations = {item.listing_id: item.explanation for item in narrative.items}
+    item_urls = {item.listing_id: item.url for item in narrative.items if getattr(item, "url", None)}
+    enriched_items = [
+        {
+            **item,
+            "explanation": item_explanations.get(str(item.get("listing_id")), ""),
+            "url": item_urls.get(str(item.get("listing_id")), f"https://krisha.kz/a/show/{item.get('listing_id')}"),
+        }
+        for item in result["items"]
+    ]
 
     return RecommendationResponse(
         model=extractor.model,
         features=features,
-        items=items,
+        items=enriched_items,
+        plan=result["plan"],
+        summary=narrative.summary,
+        source=narrative.source,
+        fallback_reason_code=narrative.fallback_reason_code,
+        fallback_reason=narrative.fallback_reason,
+        matched_candidates=result["matched_candidates"],
     )
 
 

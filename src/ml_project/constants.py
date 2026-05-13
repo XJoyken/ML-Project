@@ -60,6 +60,7 @@ ADS_COLUMNS = [
     "summary_Санузел",
     "listing_has_photo",
     "listing_photo_count",
+    "listing_description",
 ]
 
 TARGET_COLUMN = "target_price_kzt"

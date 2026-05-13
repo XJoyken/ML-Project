@@ -42,6 +42,18 @@ LISTING_COLUMN_MAP = {
     "summary_Санузел": "bathroom_type",
     "listing_has_photo": "has_photo",
     "listing_photo_count": "photo_count",
+    "listing_description": "description",
+}
+
+DISTRICT_NAME_MAP = {
+    "Bostandykskiy_r-n": "Бостандыкский район",
+    "Almalinskiy_r-n": "Алмалинский район",
+    "Auezovskiy_r-n": "Ауэзовский район",
+    "Alatauskiy_r-n": "Алатауский район",
+    "Nauryzbayskiy_r-n": "Наурызбайский район",
+    "Medeuskiy_r-n": "Медеуский район",
+    "Turksibskiy_r-n": "Турксибский район",
+    "Zhetysuskiy_r-n": "Жетысуский район",
 }
 
 NORMALIZED_LISTING_COLUMNS = [
@@ -65,6 +77,7 @@ NORMALIZED_LISTING_COLUMNS = [
     "bathroom_type",
     "has_photo",
     "photo_count",
+    "description",
 ]
 
 NUMERIC_LISTING_COLUMNS = [
@@ -131,9 +144,17 @@ def normalize_listing_frame(
     add_presence_flags(canonical)
     add_complex_listing_count(canonical, reference_ads=reference_ads, fit_mode=fit_mode)
     add_derived_features(canonical)
+    canonicalize_district(canonical)
     fill_categorical_features(canonical)
+    fill_text_features(canonical)
 
     return canonical.reset_index(drop=True)
+
+
+def canonicalize_district(frame: pd.DataFrame):
+    if "district" not in frame.columns:
+        return
+    frame["district"] = frame["district"].map(lambda v: DISTRICT_NAME_MAP.get(v, v))
 
 
 def clean_implausible_year_built(frame: pd.DataFrame):
@@ -224,6 +245,11 @@ def add_complex_listing_count(
 def fill_categorical_features(frame: pd.DataFrame):
     for column in CATEGORICAL_FEATURES:
         frame[column] = frame[column].fillna("unknown").astype("string")
+
+
+def fill_text_features(frame: pd.DataFrame):
+    if "description" in frame.columns:
+        frame["description"] = frame["description"].fillna("").astype("string")
 
 
 def validate_inference_frame(frame: pd.DataFrame):
