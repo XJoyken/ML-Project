@@ -36,6 +36,7 @@ class RecommendationRequest(BaseModel):
     language: Literal["ru", "en"] = Field(default="ru")
     use_llm: bool | None = Field(default=None)
     mmr_lambda: float = Field(default=0.7, ge=0.0, le=1.0)
+    prioritize_air_quality: bool = Field(default=False)
 
 
 class RecommendationResponse(BaseModel):
@@ -119,6 +120,7 @@ def recommend_listings(
             features,
             limit=request.limit,
             mmr_lambda=request.mmr_lambda,
+            prioritize_air_quality=request.prioritize_air_quality,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Recommendation input is invalid: {exc}") from exc
@@ -130,6 +132,7 @@ def recommend_listings(
         items=result["items"],
         language=request.language,
         use_llm=request.use_llm,
+        prioritize_air_quality=request.prioritize_air_quality,
     )
     item_explanations = {item.listing_id: item.explanation for item in narrative.items}
     item_urls = {item.listing_id: item.url for item in narrative.items if getattr(item, "url", None)}

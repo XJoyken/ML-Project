@@ -47,13 +47,13 @@ def score_numeric(
     if preference == "equal":
         return _score_equal(actual, target, feature)
     if preference == "at_most":
-        return _score_at_most(actual, target)
+        return _score_at_most(actual, target, feature)
     if preference == "at_least":
         return _score_at_least(actual, target)
     if preference == "prefer_low":
-        return _score_at_most(actual, target)
+        return _score_prefer_low(actual, target, feature)
     if preference == "prefer_high":
-        return _score_at_least(actual, target)
+        return _score_prefer_high(actual, target, feature)
     return 0.0
 
 
@@ -66,10 +66,12 @@ def hard_filter_passes(
 ) -> bool:
     if math.isnan(actual):
         return False
-    if preference == "at_most" or preference == "prefer_low":
+    if preference in ("prefer_low", "prefer_high"):
+        return True
+    if preference == "at_most":
         slack_limit = target * (1.0 + HARD_AT_MOST_SLACK) if target > 0 else target
         return actual <= slack_limit
-    if preference == "at_least" or preference == "prefer_high":
+    if preference == "at_least":
         slack_limit = target * (1.0 - HARD_AT_LEAST_SLACK) if target > 0 else target
         return actual >= slack_limit
     if preference == "equal":
@@ -77,6 +79,8 @@ def hard_filter_passes(
             return round(actual) == round(target)
         if feature == PRICE_FEATURE:
             return abs(actual - target) <= max(target * PRICE_EQUAL_TOLERANCE, 1.0)
+        if feature.startswith("has_") or feature.startswith("is_"):
+            return actual == target
         return abs(actual - target) <= max(abs(target) * 0.10, 1.0)
     return True
 
@@ -100,10 +104,12 @@ def _score_equal(actual: float, target: float, feature: str) -> float:
     return max(0.0, 1.0 - abs(actual - target) / scale)
 
 
-def _score_at_most(actual: float, target: float) -> float:
+def _score_at_most(actual: float, target: float, feature: str = "") -> float:
     if target <= 0:
         return 1.0 if actual <= 0 else 0.0
     if actual <= target:
+        if feature == PRICE_FEATURE:
+            return 0.8 + 0.2 * (actual / target)
         return 1.0
     overshoot = (actual - target) / target
     return max(0.0, 1.0 - overshoot)
@@ -116,3 +122,16 @@ def _score_at_least(actual: float, target: float) -> float:
         return 1.0
     undershoot = (target - actual) / target
     return max(0.0, 1.0 - undershoot)
+
+
+def _score_prefer_low(actual: float, target: float, feature: str) -> float:
+    if target <= 0:
+        scale = 500.0 if feature.endswith("_m") else 5.0
+    else:
+        scale = target
+    return math.exp(-actual / scale)
+
+
+def _score_prefer_high(actual: float, target: float, feature: str) -> float:
+    scale = target if target > 0 else 1.0
+    return 1.0 - math.exp(-actual / scale)

@@ -37,7 +37,8 @@ FallbackReason = Literal[
     "unknown",
 ]
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 
 class NarrativeReport(BaseModel):

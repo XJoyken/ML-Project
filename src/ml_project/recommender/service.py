@@ -11,6 +11,7 @@ from ml_project.constants import PROCESSED_DATASET_PATH, POI_SOURCE_FILES, AIR_Q
 from ml_project.data import load_listings
 from ml_project.poi import load_poi_catalog
 from ml_project.air import load_air_catalog
+from ml_project.thresholds import classify_pm25, score_air_tier
 
 from .mmr import build_similarity_matrix, mmr_select
 from .scoring import (
@@ -35,6 +36,11 @@ CANDIDATE_POOL_MULTIPLIER = 8
 MIN_CANDIDATE_POOL = 30
 DIVERSITY_FEATURES = ("lat", "lon", "target_price_kzt", "rooms")
 
+# Air priority is an additive tiebreaker, never a feature with its own weight.
+# Max swing is ±AIR_BONUS_HALF_RANGE on the [0, 1] score, so it can only re-rank
+# near-tied candidates and cannot override legitimate preference mismatches.
+AIR_BONUS_HALF_RANGE = 0.05  # final_score += (air_score - 0.5) * (2 * 0.05) at most
+
 
 @dataclass(slots=True)
 class QueryTarget:
@@ -51,9 +57,12 @@ class QueryPlan:
     numeric_targets: list[QueryTarget] = field(default_factory=list)
     categorical_targets: list[QueryTarget] = field(default_factory=list)
     boolean_targets: list[QueryTarget] = field(default_factory=list)
+    excluded_districts: list[str] = field(default_factory=list)
     intent: str = "unknown"
 
     def is_empty(self) -> bool:
+        # An exclusion alone is not enough to recommend — the user must give at least
+        # one positive preference. Otherwise the recommender has nothing to score by.
         return not (self.numeric_targets or self.categorical_targets or self.boolean_targets)
 
 
@@ -61,10 +70,15 @@ class QueryPlan:
 class ScoredCandidate:
     index: int
     total_score: float
+    base_score: float
     weight_sum: float
     numeric_matches: list[NumericMatch]
     categorical_matches: list[CategoricalMatch]
     hard_failures: list[str]
+    air_pm25_cold_day: float | None = None
+    air_pm25_warm_day: float | None = None
+    air_score: float | None = None
+    air_bonus: float = 0.0
 
 
 class RecommendationService:
@@ -93,6 +107,7 @@ class RecommendationService:
         
         self.poi_catalog = load_poi_catalog(POI_SOURCE_FILES)
         self.air_catalog = load_air_catalog(AIR_QUALITY_RAW_PATH)
+        self.air_features = self.air_catalog.build_feature_frame(self.features)
 
     def recommend(
         self,
@@ -100,6 +115,7 @@ class RecommendationService:
         *,
         limit: int = 5,
         mmr_lambda: float = 0.7,
+        prioritize_air_quality: bool = False,
     ) -> dict[str, Any]:
         limit = max(1, min(int(limit), len(self.features)))
         plan = self._build_query_plan(features)
@@ -114,7 +130,7 @@ class RecommendationService:
             relaxed_mask = self._hard_filter_mask(plan, drop_hard=True)
             candidate_indices = np.flatnonzero(relaxed_mask.to_numpy())
 
-        scored = self._score_candidates(plan, candidate_indices)
+        scored = self._score_candidates(plan, candidate_indices, prioritize_air_quality)
         if not scored:
             raise ValueError("No candidates left after scoring.")
 
@@ -129,6 +145,7 @@ class RecommendationService:
             "matched_candidates": len(candidate_indices),
             "items": [self._build_item(candidate) for candidate in diversified],
             "plan": self._plan_payload(plan),
+            "air_priority_active": bool(prioritize_air_quality),
         }
 
     def _build_query_plan(self, features: Any) -> QueryPlan:
@@ -180,25 +197,38 @@ class RecommendationService:
             )
 
         for location in getattr(features, "location_preferences", []) or []:
-            if (
-                str(location.kind) == "district"
-                and str(location.preference) == "include"
-                and "district" in self.categorical_columns
-            ):
+            if str(location.kind) != "district" or "district" not in self.categorical_columns:
+                continue
+            value = str(location.value).strip()
+            if not value:
+                continue
+            if str(location.preference) == "include":
                 plan.categorical_targets.append(
                     QueryTarget(
                         feature="district",
                         preference=None,
-                        value=str(location.value),
+                        value=value,
                         weight=float(location.weight),
                         evidence=getattr(location, "evidence", None),
                         kind="categorical",
                     )
                 )
+            elif str(location.preference) == "exclude":
+                plan.excluded_districts.append(value)
         return plan
 
     def _hard_filter_mask(self, plan: QueryPlan, *, drop_hard: bool = False) -> pd.Series:
         mask = pd.Series(True, index=self.features.index)
+
+        # District exclusions are ALWAYS hard — even when the rest of the filters
+        # are relaxed for graceful degradation, we never surface listings the user
+        # explicitly rejected.
+        if plan.excluded_districts and "district" in self.categorical_columns:
+            excluded_lower = {d.strip().lower() for d in plan.excluded_districts if d.strip()}
+            if excluded_lower:
+                column = self.features["district"].astype("string").str.lower()
+                mask &= ~column.isin(excluded_lower)
+
         if drop_hard:
             return mask
 
@@ -230,6 +260,7 @@ class RecommendationService:
         self,
         plan: QueryPlan,
         indices: np.ndarray,
+        prioritize_air_quality: bool = False,
     ) -> list[ScoredCandidate]:
         results: list[ScoredCandidate] = []
         all_targets = plan.numeric_targets + plan.boolean_targets
@@ -301,15 +332,35 @@ class RecommendationService:
                     )
                 )
 
-            total_score = score_sum / weight_sum
+            base_score = score_sum / weight_sum
+
+            pm25_cold = float(self.air_features["air_pm25_cold_day"].iloc[index])
+            pm25_warm = float(self.air_features["air_pm25_warm_day"].iloc[index])
+            air_score: float | None = None
+            air_bonus = 0.0
+            if not np.isnan(pm25_cold):
+                tier = classify_pm25(pm25_cold)
+                air_score = score_air_tier(tier)
+            if prioritize_air_quality and air_score is not None:
+                # Tiebreaker only: a perfect-air listing gets +AIR_BONUS_HALF_RANGE,
+                # a very polluted one gets -AIR_BONUS_HALF_RANGE. The 0.1 total swing
+                # cannot promote a 0.7-score candidate above a 0.9-score one.
+                air_bonus = (air_score - 0.5) * 2.0 * AIR_BONUS_HALF_RANGE
+
+            total_score = base_score + air_bonus
             results.append(
                 ScoredCandidate(
                     index=int(index),
                     total_score=float(total_score),
+                    base_score=float(base_score),
                     weight_sum=float(weight_sum),
                     numeric_matches=numeric_matches,
                     categorical_matches=categorical_matches,
                     hard_failures=hard_failures,
+                    air_pm25_cold_day=None if np.isnan(pm25_cold) else float(pm25_cold),
+                    air_pm25_warm_day=None if np.isnan(pm25_warm) else float(pm25_warm),
+                    air_score=air_score,
+                    air_bonus=float(air_bonus),
                 )
             )
         return results
@@ -350,16 +401,23 @@ class RecommendationService:
         listing = self.listings.iloc[candidate.index]
         lat = _optional_float(listing.get("lat"))
         lon = _optional_float(listing.get("lon"))
-        
+
         nearby_pois = []
         nearest_air = None
         if lat is not None and lon is not None:
             nearby_pois = self.poi_catalog.nearest_many(lat=lat, lon=lon, categories=DEFAULT_EXPLANATION_CATEGORIES)
             nearest_air = self.air_catalog.nearest_for(lat=lat, lon=lon)
-            
+
         return {
             "listing_id": _optional_str(listing.get("listing_id")),
             "match_score": round(candidate.total_score, 4),
+            "base_score": round(candidate.base_score, 4),
+            "air_bonus": round(candidate.air_bonus, 4),
+            "air_score": (
+                None if candidate.air_score is None else round(candidate.air_score, 4)
+            ),
+            "air_pm25_cold_day": candidate.air_pm25_cold_day,
+            "air_pm25_warm_day": candidate.air_pm25_warm_day,
             "price_kzt": _optional_float(listing.get("target_price_kzt")),
             "rooms": _optional_float(listing.get("rooms")),
             "area_m2": _optional_float(listing.get("area_m2")),
@@ -403,6 +461,7 @@ class RecommendationService:
                 }
                 for t in plan.categorical_targets
             ],
+            "excluded_districts": list(plan.excluded_districts),
         }
 
 

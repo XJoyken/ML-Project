@@ -42,6 +42,7 @@ def generate(
     use_llm: bool | None = None,
     llm_client: Any | None = None,
     llm_model: str | None = None,
+    prioritize_air_quality: bool = False,
 ) -> RecommendationNarrative:
     if use_llm is None:
         use_llm = bool(os.getenv("GEMINI_API_KEY"))
@@ -54,6 +55,7 @@ def generate(
                 language=language,
                 client=llm_client,
                 model=llm_model or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+                prioritize_air_quality=prioritize_air_quality,
             )
             report.source = "gemini"
             _strip_quotes_in_place(report)
@@ -80,6 +82,7 @@ def _generate_with_gemini(
     language: Language,
     client: Any | None,
     model: str,
+    prioritize_air_quality: bool = False,
 ) -> RecommendationNarrative:
     from google import genai
     from google.genai import types
@@ -87,7 +90,7 @@ def _generate_with_gemini(
     if client is None:
         client = genai.Client()
 
-    system_prompt = _system_prompt(language)
+    system_prompt = _system_prompt(language, prioritize_air_quality)
     payload = {
         "plan": plan_payload,
         "items": [_compact_item(item) for item in items],
@@ -106,28 +109,85 @@ def _generate_with_gemini(
     return RecommendationNarrative.model_validate_json(response.text)
 
 
-def _system_prompt(language: Language) -> str:
+def _system_prompt(language: Language, prioritize_air_quality: bool = False) -> str:
     language_instruction = (
         "Write all text fields in Russian." if language == "ru" else "Write all text fields in English."
     )
+    if prioritize_air_quality:
+        air_priority_instruction = (
+            "- AIR PRIORITY MODE is on. Each item carries `air_pm25_cold_day` (µg/m³, winter day average),\n"
+            "  `air_pm25_warm_day` (summer), `air_score` (0..1, higher=cleaner), and `air_bonus` — the small\n"
+            "  ranking nudge that air priority added (it is intentionally capped at ±0.05 and CANNOT override\n"
+            "  larger preference matches).\n"
+            "- For EACH listing, state the PM2.5 numbers and translate them to a verdict: ≤15 — отличный,\n"
+            "  ≤25 — хороший, ≤40 — умеренный, ≤60 — плохой, >60 — очень плохой воздух.\n"
+            "- Compare PM2.5 across the 5 listings. If a listing has noticeably cleaner air than the others,\n"
+            "  say so directly and quantify (e.g., 'PM2.5 22 vs средние 38 в остальной выдаче').\n"
+            "- If a listing was bumped up partly because of air (air_bonus > 0) AND it has a compromise\n"
+            "  (higher price than another option, larger distance to user-requested POI, or any hard_failures),\n"
+            "  state the trade-off EXPLICITLY: e.g., 'квартира дороже на 3 млн, но воздух чище на 40% по PM2.5'.\n"
+            "- Do NOT pretend air priority forced a compromise when it did not — only call it out when the\n"
+            "  numbers actually show a worse main metric paired with a meaningfully cleaner air reading."
+        )
+    else:
+        air_priority_instruction = ""
     return f"""
-You explain why a set of apartments was recommended to a buyer in detail.
+You explain why a set of apartments was recommended to a buyer.
 
 Input has two parts:
-- plan: the user's preferences (numeric, categorical, intent). Each target has a weight 0..1.
-- items: candidate listings, each with a structured `matches` list, original seller's `description`, `nearby_pois`, and `nearest_air_sensor`.
+- plan: the user's preferences (numeric, categorical, intent, excluded_districts).
+  Each target has a weight 0..1. excluded_districts lists areas the user explicitly rejected.
+- items: candidate listings. Each carries:
+    - matches: structured list of how the listing scored against every user target (score 0..1, hard_failed flag).
+    - base_score: ranking score from user preferences alone (before any air bonus).
+    - match_score: final score actually used for ranking.
+    - air_pm25_cold_day / air_pm25_warm_day / air_score / air_bonus.
+    - nearby_pois: nearest POI per category, each with `category`, `name`, `distance_m`.
+    - nearest_air_sensor: nearest PM2.5 monitoring station (distance, pm25_cold_day, pm25_warm_day).
+    - description: original seller text in Russian (may be missing).
 
 Rules:
 - {language_instruction}
-- summary: one short paragraph (2-4 sentences) explaining how these listings cover DIFFERENT scenarios.
-  Mention dispersion across price, district, rooms, key amenities. Avoid generic praise.
-- items: Provide a DETAILED explanation for EACH listing. You MUST explain how the listing matches the user's explicit parameters from the plan. Also, elaborate on the pros and cons of the listing, mention nearby points of interest (objects nearby), conveniences, and inconveniences based on the provided data, so the user can make an informed choice.
-- description usage: If the original seller `description` is available, you MUST read it and extract any useful perks (e.g. "good neighbors", "garage", "gated community") and explicitly mention: "Продавец упоминает в своем объявлении: ..." (or English equivalent) formatting the useful perks extracted from it.
-- url: You must provide the URL to the listing formatted exactly as "https://krisha.kz/a/show/{{listing_id}}".
-- Never wrap proper nouns (POI names, district names) in quotation marks of any kind.
+
+- summary: 2-4 sentences. Explain how the listings cover DIFFERENT scenarios
+  (price band, district, rooms, key amenities). Avoid generic praise. Mention dispersion concretely
+  using real numbers. If excluded_districts is non-empty, briefly confirm those districts are excluded.
+
+- items: For EACH listing produce one cohesive paragraph (NOT a bullet list, NOT a one-liner)
+  that integrates the following FOUR sections in this order, written naturally, woven into sentences:
+
+  Section 1 — Match against plan (REQUIRED). State every plan target this listing satisfies with concrete
+  numbers: cite the asked-for price and the actual price, rooms requested vs rooms found, district,
+  has_complex_id (ЖК), dist_to_center_km, floor constraints, etc. If a target has hard_failed=true,
+  name it as the explicit compromise: "комнат меньше на 1", "цена выше бюджета на 4 млн", etc.
+
+  Section 2 — Nearby objects (REQUIRED, never skip even if obvious). Read nearby_pois and
+  describe AT LEAST 4 distinct POI categories with their distance in meters (rounded to 10 m) and the
+  POI name. Group them by relevance: schools/kindergartens/universities for families and students,
+  metro/bus_stops for commuting, parks/restaurants_coffee/fitness for daily life, clinics/hospitals
+  for medical access. If a category is unusually far (acceptable or far tier per the eval module),
+  explicitly say so — that is a real downside.
+
+  Section 3 — Air quality (REQUIRED whenever air data is present). State the PM2.5 numbers for both
+  cold day and warm day with the verdict tier (≤15 отличный, ≤25 хороший, ≤25-40 умеренный,
+  ≤40-60 плохой, >60 очень плохой). One concrete sentence is enough — do not skip this section.
+
+  Section 4 — Seller description perks (REQUIRED whenever `description` is non-empty). Read the
+  Russian seller text and pull 1–3 concrete perks ("евроремонт", "гардеробная", "панорамные окна",
+  "охраняемый двор", "вид на горы", "новая сантехника"). Quote them with the lead-in
+  "Продавец упоминает: …" (RU) or "Seller notes: …" (EN). If `description` is missing or empty,
+  skip this section entirely — do NOT mention its absence.
+
+  Length target: 4–7 sentences per listing. Dense and concrete, no filler.
+
+- url: emit exactly "https://krisha.kz/a/show/{{listing_id}}".
+
+{air_priority_instruction}
+
+- Never wrap proper nouns (POI names, district names, ЖК names) in quotation marks of any kind.
   Bad: "Бостандыкский район". Good: Бостандыкский район.
-- If a listing has hard_failures, clearly mention the compromise without hiding it.
-- Use only data from the payload. Never invent POIs or features not present in the input.
+- Use only data from the payload. Never invent POIs, district names, or numbers.
+- Write distances in meters when < 1000 m, in kilometers (one decimal) when ≥ 1000 m.
 """.strip()
 
 
@@ -147,6 +207,11 @@ def _compact_item(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "listing_id": item.get("listing_id"),
         "match_score": item.get("match_score"),
+        "base_score": item.get("base_score"),
+        "air_bonus": item.get("air_bonus"),
+        "air_score": item.get("air_score"),
+        "air_pm25_cold_day": item.get("air_pm25_cold_day"),
+        "air_pm25_warm_day": item.get("air_pm25_warm_day"),
         "price_kzt": item.get("price_kzt"),
         "rooms": item.get("rooms"),
         "area_m2": item.get("area_m2"),
@@ -206,13 +271,45 @@ def _deterministic_item_text(item: dict[str, Any], language: Language) -> str:
         listing_summary_parts.append(str(item["district"]))
     header = ", ".join(listing_summary_parts)
 
-    if not parts:
-        return header
+    blocks = [header]
 
-    matches_text = "; ".join(p for p in parts if p)
-    if language == "en":
-        return f"{header}. Matches: {matches_text}."
-    return f"{header}. Совпадения: {matches_text}."
+    if parts:
+        matches_text = "; ".join(p for p in parts if p)
+        if language == "en":
+            blocks.append(f"Matches: {matches_text}.")
+        else:
+            blocks.append(f"Совпадения: {matches_text}.")
+
+    poi_text = ""
+    if item.get("nearby_pois"):
+        pois = item["nearby_pois"]
+        poi_items = []
+        for poi in pois[:4]:
+            from ..thresholds import category_label
+            cat = category_label(poi["category"], language)
+            dist = poi["distance_m"]
+            poi_items.append(f"{cat} ({dist:.0f} м)")
+        if poi_items:
+            poi_text = ("Nearby: " if language == "en" else "Рядом: ") + ", ".join(poi_items) + "."
+            blocks.append(poi_text)
+            
+    air_text = ""
+    if item.get("nearest_air_sensor"):
+        pm25 = item["nearest_air_sensor"].get("pm25_cold_day")
+        if pm25 is not None:
+            air_text = (f"Air PM2.5: {pm25:.0f}" if language == "en" else f"Воздух PM2.5: {pm25:.0f}") + "."
+            blocks.append(air_text)
+            
+    desc_text = ""
+    if item.get("description"):
+        desc = str(item["description"]).strip()
+        if desc:
+            if len(desc) > 150:
+                desc = desc[:147] + "..."
+            desc_text = (f"Description: {desc}" if language == "en" else f"Описание продавца: {desc}")
+            blocks.append(desc_text)
+
+    return "\n".join(blocks)
 
 
 def _describe_match(match: dict[str, Any], language: Language) -> str:
@@ -233,6 +330,10 @@ def _describe_match(match: dict[str, Any], language: Language) -> str:
     if feature == "rooms":
         rooms = int(round(float(actual)))
         return f"{rooms}-к." if language == "ru" else f"{rooms} rooms"
+    if feature == "has_complex_id":
+        if float(actual) > 0.0:
+            return "в ЖК" if language == "ru" else "in residential complex"
+        return "не в ЖК" if language == "ru" else "not in residential complex"
     if match.get("kind") == "categorical":
         return str(actual)
     if isinstance(actual, (int, float)):

@@ -6,7 +6,8 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 NumericFeatureName = Literal[
     "target_price_kzt",
@@ -83,23 +84,54 @@ Domain:
 - Do not invent budget, rooms, district, or amenities.
 
 Normalization rules:
-- Price limits map to target_price_kzt.
-- "ЖК", "жилой комплекс", "новостройка в ЖК" map to boolean has_complex_id=true.
-- "не первый этаж" maps to is_first_floor=false.
-- "не последний этаж" maps to is_last_floor=false.
-- "рядом", "недалеко", "пешком", "в шаговой доступности" for POI features map to
-  *_nearest_dist_m with preference="at_most".
-- If the user says a POI should be near but gives no distance, use 500 meters.
-- If the user says "очень близко", "возле", or "рядом с домом" without a distance, use 300 meters.
-- If the user asks for many nearby POIs, use *_count_1000m with preference="prefer_high".
-- Use restaurants_coffee for cafes, coffee shops, restaurants, and food nearby.
-- Use transport for bus stops and public transport; use metro only for explicit subway/metro.
-- Air quality preferences map to air_pm25_cold_day or air_pm25_warm_day with preference="prefer_low".
+- Price expressions:
+  - "до X млн / до X миллионов / не дороже X млн / в пределах X млн / бюджет X млн" → target_price_kzt at_most X * 1_000_000.
+  - "от X млн" → target_price_kzt at_least X * 1_000_000.
+  - "от X до Y млн" → two targets: at_least X*1e6 AND at_most Y*1e6, same weight.
+  - "X млн" without "до/от" → target_price_kzt at_most X * 1_000_000 (treat as cap).
+  - "X тыс / X тысяч" → multiply by 1_000.
+  - Always emit the price as plain digits, not strings.
+- Building type and complex:
+  - "ЖК", "жилой комплекс", "новостройка", "новострой", "в новостройке" → has_complex_id=true.
+  - "ЖК с именем X" or "в ЖК «X»" or "Айнабулак", "Самал", "Назарбаев" (named complex) → also has_complex_id=true.
+- Rooms (slang and numerals):
+  - "студия", "студию" → rooms equal 1.
+  - "однушка", "однушку", "1-к", "1-комнатная", "1 комн" → rooms equal 1.
+  - "двушка", "двушку", "2-к", "2-комнатная", "2 комн", "две комнаты" → rooms equal 2.
+  - "трешка", "трёшка", "трешку", "3-к", "3-комнатная", "3 комн", "три комнаты" → rooms equal 3.
+  - "четырешка", "четырёшка", "4-к", "4-комнатная", "4 комн", "четыре комнаты" → rooms equal 4.
+- Floor:
+  - "не первый этаж", "не на первом" → is_first_floor=false.
+  - "не последний этаж", "не на последнем" → is_last_floor=false.
+- Distance to POI:
+  - "рядом", "недалеко", "пешком", "в шаговой доступности" for any POI → *_nearest_dist_m at_most 500 meters.
+  - "очень близко", "возле", "рядом с домом" without explicit distance → at_most 300 meters.
+  - Explicit "в 500 м / в 1 км" → use that number directly.
+  - "много POI поблизости" / "большой выбор" → *_count_1000m prefer_high (value 5).
+- Center:
+  - "в центре", "ближе к центру", "центр города" → dist_to_center_km prefer_low value 0.0.
+  - "в пределах N км от центра" → dist_to_center_km at_most N.
+  - Default value for "ближе к центру" without number: use 5.0 km cap (at_most preference).
+- POI categories:
+  - restaurants_coffee for cafés, coffee shops, restaurants, food places.
+  - transport for bus stops / minibuses / public transport; metro only for explicit subway/metro.
+  - parks, supermarkets, fitness — use named matches only.
+- Air quality preferences → air_pm25_cold_day or air_pm25_warm_day with preference="prefer_low".
+- District:
+  - Named districts like "Бостандыкский", "Алмалинский" → categorical_targets feature=district value=full name.
+  - "не Алмалинский" → location_preferences kind=district preference=exclude.
 
-Weights:
-- Hard requirements: 1.0.
-- Clear preferences: 0.7 to 0.9.
-- Soft wishes: 0.4 to 0.6.
+Weights (CRITICAL — affects hard filtering downstream):
+- Use weight ≥ 0.9 for any preference that the user stated as a clear, non-negotiable requirement:
+  - Specific number of rooms ("двушка", "2-комн"): weight 0.95.
+  - Hard price cap ("до 40 млн", "не дороже X"): weight 0.95.
+  - Explicit ЖК / new build requirement: weight 0.9.
+  - "ближе к центру" or "в центре": weight 0.9 (treat as hard preference, not a soft wish).
+  - Named district inclusion: weight 0.9.
+  - "не первый этаж", "не последний этаж": weight 0.9.
+- Use weight 0.6–0.8 for clear but flexible wishes ("желательно", "хотелось бы", "если есть").
+- Use weight 0.3–0.5 only for vague nice-to-haves with hedging language.
+- Default to the HIGHER end of the range when the user phrases it as a requirement.
 
 Evidence:
 - Every target must include the shortest original phrase that caused it.

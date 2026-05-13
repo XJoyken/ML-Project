@@ -39,10 +39,30 @@ def test_score_numeric_equal_rooms_exact_and_off_by_one():
     assert score_numeric(actual=4.0, target=2.0, preference="equal", feature="rooms") == 0.0
 
 
-def test_score_numeric_prefer_low_acts_like_at_most():
-    a = score_numeric(actual=20.0, target=30.0, preference="prefer_low", feature="air_pm25_warm_day")
-    b = score_numeric(actual=20.0, target=30.0, preference="at_most", feature="air_pm25_warm_day")
-    assert a == b
+def test_score_numeric_prefer_low_decays_monotonically():
+    # prefer_low is a soft monotonic decay (exp(-actual/scale)), unlike the sharp at_most cliff.
+    s_clean = score_numeric(actual=5.0, target=30.0, preference="prefer_low", feature="air_pm25_warm_day")
+    s_target = score_numeric(actual=30.0, target=30.0, preference="prefer_low", feature="air_pm25_warm_day")
+    s_polluted = score_numeric(actual=80.0, target=30.0, preference="prefer_low", feature="air_pm25_warm_day")
+    assert s_clean > s_target > s_polluted
+    assert 0.0 < s_polluted < 0.2
+
+
+def test_score_numeric_prefer_low_never_hard_fails():
+    # prefer_* preferences should never block via the hard filter
+    from ml_project.recommender.scoring import hard_filter_passes
+
+    assert hard_filter_passes(
+        actual=100.0, target=10.0, preference="prefer_low", feature="air_pm25_warm_day"
+    ) is True
+
+
+def test_score_numeric_at_most_price_rewards_cheaper():
+    cheap = score_numeric(actual=20_000_000, target=40_000_000, preference="at_most", feature="target_price_kzt")
+    at_cap = score_numeric(actual=40_000_000, target=40_000_000, preference="at_most", feature="target_price_kzt")
+    assert cheap < at_cap  # bigger fraction of target → higher score (0.8 + 0.2*frac)
+    assert 0.85 <= cheap <= 0.95
+    assert at_cap == 1.0
 
 
 def test_hard_filter_passes_at_most_with_slack():
