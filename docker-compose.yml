@@ -2,21 +2,60 @@ services:
   backend:
     build: .
     container_name: ml-backend
-    ports:
-      - "8000:8000"
+    volumes:
+      - ./datasets:/app/datasets:ro
+      - ./models:/app/models:ro
+      - ./mlruns:/app/mlruns:ro
+      - ./mlflow.db:/app/mlflow.db:ro
     env_file:
       - .env
+    networks:
+      - internal
     restart: unless-stopped
 
   frontend:
-    build: ./frontend_next-1
+    build:
+      context: ./frontend_next-1
+      args:
+        # ═══════════════════════════════════════════════════════
+        # ⚠  ЗАМЕНИ YOUR_DOMAIN на свой домен перед билдом!
+        # Примеры: https://almatynest.kz/api
+        #          https://mysite.com/api
+        # ═══════════════════════════════════════════════════════
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
     container_name: ml-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      # фронт ходит на бэк по имени сервиса в докер-сети
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-      - BACKEND_URL=http://backend:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
     restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: ml-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - internal
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: ml-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+
+networks:
+  internal:
+    driver: bridge
