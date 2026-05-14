@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-
-
-
 import os
 from importlib import import_module
 from functools import lru_cache
@@ -22,15 +19,11 @@ from .recommendation_features import (
     GeminiFeatureExtractor,
 )
 
-
-
 app = FastAPI(title="Almaty Apartment Recommender API")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,6 +72,72 @@ class ApartmentEvaluationResponse(BaseModel):
     evaluation: dict[str, Any]
 
 
+class InvestmentParamsOverride(BaseModel):
+    vacancy_rate: float | None = Field(
+        default=0.08, ge=0.0, le=0.9,
+        description="Share of year the apartment stands empty (0.08 = 8%). Default 8%.",
+    )
+    repair_cost_pct: float | None = Field(
+        default=0.05, ge=0.0, le=0.5,
+        description="One-time repair cost as a fraction of sale price (0.05 = 5%). Default 5%.",
+    )
+    agent_commission_months: float | None = Field(
+        default=0.5, ge=0.0, le=3.0,
+        description=(
+            "Broker fee in months of rent paid once per tenant turnover (0.5 = half a month). "
+            "Default 0.5."
+        ),
+    )
+    tenant_turnover_years: float | None = Field(
+        default=1.5, ge=0.5, le=10.0,
+        description="Average number of years a single tenant stays before being replaced. Default 1.5.",
+    )
+    maintenance_pct: float | None = Field(
+        default=0.05, ge=0.0, le=0.3,
+        description="Annual maintenance/running costs as a fraction of gross rent (0.05 = 5%). Default 5%.",
+    )
+    property_tax_pct: float | None = Field(
+        default=0.003, ge=0.0, le=0.05,
+        description="Annual property tax as a fraction of sale price (0.003 = 0.3%). Default 0.3%.",
+    )
+    inflation_rate_pct: float | None = Field(
+        default=12.3, ge=0.0, le=100.0,
+        description=(
+            "Expected annual CPI inflation in percent. "
+            "Default: 12.3% (Kazakhstan 2025 actual from macro dataset). "
+            "The system adds risk_premium_pct to this to get the discount rate."
+        ),
+    )
+    risk_premium_pct: float | None = Field(
+        default=3.0, ge=0.0, le=20.0,
+        description=(
+            "Extra annual return required above inflation to justify illiquid real estate, in pp. "
+            "Default 3 pp. Discount rate = inflation_rate_pct + risk_premium_pct = 15.3%."
+        ),
+    )
+    horizon_years: int | None = Field(
+        default=10, ge=1, le=30,
+        description="Investment horizon for NPV calculation in years. Default 10.",
+    )
+
+
+class InvestmentRequest(BaseModel):
+    url: str = Field(min_length=10, max_length=2000)
+    language: Literal["ru", "en"] = Field(default="ru")
+    use_llm: bool | None = Field(default=None)
+    investment_params: InvestmentParamsOverride | None = Field(default=None)
+
+
+class InvestmentResponse(BaseModel):
+    source_url: str
+    parsed_listing: dict[str, Any]
+    sale_evaluation: dict[str, Any]
+    rent_evaluation: dict[str, Any]
+    investment: dict[str, Any]
+    market_summary: dict[str, Any]
+    narrative: dict[str, Any]
+
+
 @lru_cache
 def get_feature_extractor() -> GeminiFeatureExtractor:
     return GeminiFeatureExtractor(
@@ -101,6 +160,29 @@ def get_recommendation_narrative():
 def get_apartment_evaluator():
     service_module = import_module("ml_project.evaluation")
     return service_module.ApartmentEvaluationService()
+
+
+@lru_cache
+def get_rent_evaluator():
+    service_module = import_module("ml_project.rent.evaluation")
+    return service_module.RentEvaluationService()
+
+
+@lru_cache
+def get_investment_narrative_module():
+    return import_module("ml_project.rent.narrative")
+
+
+@lru_cache
+def get_macro_catalogs():
+    macro = import_module("ml_project.macro")
+    inflation = macro.load_inflation_catalog()
+    market = macro.load_market_catalog()
+    return inflation, market, macro.summarise(inflation, market)
+
+
+def get_investment_module():
+    return import_module("ml_project.rent.investment")
 
 
 @app.get("/health")
@@ -195,4 +277,72 @@ def evaluate_apartment(
         source_url=request.url,
         parsed_listing=listing,
         evaluation=evaluation,
+    )
+
+
+@app.post("/apartments/investment", response_model=InvestmentResponse)
+def evaluate_investment(
+    request: InvestmentRequest,
+    sale_evaluator=Depends(get_apartment_evaluator),
+    rent_evaluator=Depends(get_rent_evaluator),
+    narrative_module=Depends(get_investment_narrative_module),
+    macro_catalogs=Depends(get_macro_catalogs),
+) -> InvestmentResponse:
+    investment_module = get_investment_module()
+    inflation, market, market_summary = macro_catalogs
+
+    try:
+        listing = parse_krisha_listing_url(request.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Krisha parse failed: {exc}") from exc
+
+    try:
+        sale_evaluation = sale_evaluator.evaluate(
+            listing,
+            language=request.language,
+            use_llm=False,  # the investment narrative carries its own LLM text
+        )
+        rent_evaluation = rent_evaluator.evaluate(listing)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Inference failed: {exc}") from exc
+
+    override = request.investment_params or InvestmentParamsOverride()
+    params = investment_module.InvestmentParams(
+        vacancy_rate=override.vacancy_rate,
+        repair_cost_pct=override.repair_cost_pct,
+        agent_commission_months=override.agent_commission_months,
+        tenant_turnover_years=override.tenant_turnover_years,
+        maintenance_pct=override.maintenance_pct,
+        property_tax_pct=override.property_tax_pct,
+        inflation_rate_pct=override.inflation_rate_pct,
+        risk_premium_pct=override.risk_premium_pct,
+        horizon_years=override.horizon_years,
+    )
+    investment = investment_module.compute_investment_metrics(
+        sale_price_kzt=float(sale_evaluation["listing_price_kzt"]),
+        monthly_rent_kzt=float(rent_evaluation["predicted_rent_kzt"]),
+        params=params,
+        inflation=inflation,
+        market=market,
+    ).as_dict()
+
+    narrative = narrative_module.generate(
+        investment=investment,
+        sale_evaluation=sale_evaluation,
+        rent_evaluation=rent_evaluation,
+        market_summary=market_summary,
+        language=request.language,
+        use_llm=request.use_llm,
+    )
+
+    return InvestmentResponse(
+        source_url=request.url,
+        parsed_listing=listing,
+        sale_evaluation=sale_evaluation,
+        rent_evaluation=rent_evaluation,
+        investment=investment,
+        market_summary=market_summary,
+        narrative=narrative.model_dump(),
     )
