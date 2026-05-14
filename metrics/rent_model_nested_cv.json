@@ -1,0 +1,18 @@
+{
+  "model": "lightgbm",
+  "target": "rent_price_kzt",
+  "evaluation": "nested 5x5 cross-validation",
+  "metrics": {
+    "mae_kzt":   { "mean": 48353.961691258206,  "std":   2011.4536615327463 },
+    "mape":      { "mean": 0.12257980186231884, "std":   0.0029050476537819717 },
+    "rmse_kzt":  { "mean": 101750.33364711859,  "std":   8166.436439254694 },
+    "r2":        { "mean": 0.86642243316704,    "std":   0.01824440150661053 }
+  },
+  "hyperparameters": {
+    "n_estimators":       3500,
+    "learning_rate":      0.03,
+    "num_leaves":         255,
+    "min_child_samples":  20,
+    "reg_lambda":         15.0
+  }
+}

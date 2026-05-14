@@ -1,0 +1,216 @@
+{
+  "description": "Distribution of investment economics across every listing in the processed feature frame. Sale price = listing price as-is. Monthly rent = LightGBM rent-model prediction. Base scenario uses the production defaults (vacancy 8%, repair 5%, agent 0.5 mo, turnover 1.5 yr, maintenance 5%, property tax 0.3%, inflation 12.3%, risk premium 3 pp, horizon 10 yr).",
+  "base_scenario": {
+    "params": {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 3.0,
+      "discount_rate_pct": 15.3
+    },
+    "n_listings": 38762,
+    "metrics": {
+      "gross_yield_pct": {
+        "n": 38762,
+        "unit": "%",
+        "mean": 7.3152,
+        "median": 7.2518,
+        "std": 1.5561,
+        "min": 1.969,
+        "max": 22.7472,
+        "p5": 4.9349,
+        "p25": 6.3102,
+        "p50": 7.2518,
+        "p75": 8.202,
+        "p95": 9.8385
+      },
+      "net_yield_pct": {
+        "n": 38762,
+        "unit": "%",
+        "mean": 6.4429,
+        "median": 6.3845,
+        "std": 1.4313,
+        "min": 1.5254,
+        "max": 20.6373,
+        "p5": 4.2534,
+        "p25": 5.5184,
+        "p50": 6.3845,
+        "p75": 7.2586,
+        "p95": 8.7638
+      },
+      "payback_years_nominal": {
+        "n": 38762,
+        "unit": "years",
+        "mean": 16.322,
+        "median": 15.6628,
+        "std": 3.909,
+        "min": 4.8456,
+        "max": 65.5555,
+        "p5": 11.4106,
+        "p25": 13.7768,
+        "p50": 15.6628,
+        "p75": 18.1211,
+        "p95": 23.5104
+      },
+      "payback_years_inflation_adjusted": {
+        "n": 38762,
+        "unit": "years",
+        "mean": 15.866,
+        "median": 15.4208,
+        "std": 3.1148,
+        "min": 5.3304,
+        "max": 45.3769,
+        "p5": 11.7084,
+        "p25": 13.8111,
+        "p50": 15.4208,
+        "p75": 17.4406,
+        "p95": 21.5869
+      },
+      "npv_kzt": {
+        "n": 38762,
+        "unit": "kzt",
+        "mean": -26821638.097,
+        "median": -17054118.6822,
+        "std": 33903413.0622,
+        "min": -718687127.2279,
+        "max": 95548679.9501,
+        "p5": -78529656.3548,
+        "p25": -31231398.3237,
+        "p50": -17054118.6822,
+        "p75": -10261405.0083,
+        "p95": -4190234.4184
+      },
+      "irr_pct": {
+        "n": 38762,
+        "unit": "%",
+        "mean": 6.0964,
+        "median": 6.2091,
+        "std": 3.7231,
+        "min": -13.2846,
+        "max": 31.6239,
+        "p5": -0.1541,
+        "p25": 3.8267,
+        "p50": 6.2091,
+        "p75": 8.4093,
+        "p95": 11.8387
+      }
+    },
+    "verdict_counts": {
+      "good": 2449,
+      "average": 20101,
+      "poor": 16144,
+      "excellent": 68
+    },
+    "verdict_shares": {
+      "good": 0.0632,
+      "average": 0.5186,
+      "poor": 0.4165,
+      "excellent": 0.0018
+    }
+  },
+  "risk_premium_sensitivity": [
+    {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 0.0,
+      "discount_rate_pct": 12.3,
+      "n_listings": 38762,
+      "verdict_counts": {
+        "good": 10984,
+        "average": 13224,
+        "poor": 14401,
+        "excellent": 153
+      },
+      "verdict_shares": {
+        "good": 0.2834,
+        "average": 0.3412,
+        "poor": 0.3715,
+        "excellent": 0.0039
+      },
+      "median_real_payback_years": 13.0074,
+      "median_gross_yield_pct": 7.2518,
+      "median_net_yield_pct": 6.3845
+    },
+    {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 1.5,
+      "discount_rate_pct": 13.8,
+      "n_listings": 38762,
+      "verdict_counts": {
+        "good": 5538,
+        "average": 18720,
+        "poor": 14401,
+        "excellent": 103
+      },
+      "verdict_shares": {
+        "good": 0.1429,
+        "average": 0.4829,
+        "poor": 0.3715,
+        "excellent": 0.0027
+      },
+      "median_real_payback_years": 14.0947,
+      "median_gross_yield_pct": 7.2518,
+      "median_net_yield_pct": 6.3845
+    },
+    {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 3.0,
+      "discount_rate_pct": 15.3,
+      "n_listings": 38762,
+      "verdict_counts": {
+        "good": 2449,
+        "average": 20101,
+        "poor": 16144,
+        "excellent": 68
+      },
+      "verdict_shares": {
+        "good": 0.0632,
+        "average": 0.5186,
+        "poor": 0.4165,
+        "excellent": 0.0018
+      },
+      "median_real_payback_years": 15.4208,
+      "median_gross_yield_pct": 7.2518,
+      "median_net_yield_pct": 6.3845
+    },
+    {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 4.5,
+      "discount_rate_pct": 16.8,
+      "n_listings": 38762,
+      "verdict_counts": {
+        "average": 12671,
+        "poor": 24978,
+        "good": 1064,
+        "excellent": 49
+      },
+      "verdict_shares": {
+        "average": 0.3269,
+        "poor": 0.6444,
+        "good": 0.0274,
+        "excellent": 0.0013
+      },
+      "median_real_payback_years": 17.0929,
+      "median_gross_yield_pct": 7.2518,
+      "median_net_yield_pct": 6.3845
+    },
+    {
+      "inflation_rate_pct": 12.3,
+      "risk_premium_pct": 6.0,
+      "discount_rate_pct": 18.3,
+      "n_listings": 38762,
+      "verdict_counts": {
+        "average": 6050,
+        "poor": 32155,
+        "good": 526,
+        "excellent": 31
+      },
+      "verdict_shares": {
+        "average": 0.1561,
+        "poor": 0.8295,
+        "good": 0.0136,
+        "excellent": 0.0008
+      },
+      "median_real_payback_years": 19.2872,
+      "median_gross_yield_pct": 7.2518,
+      "median_net_yield_pct": 6.3845
+    }
+  ]
+}

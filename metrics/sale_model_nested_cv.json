@@ -1,0 +1,18 @@
+{
+  "model": "lightgbm",
+  "target": "target_price_kzt",
+  "evaluation": "nested 5x3 cross-validation",
+  "metrics": {
+    "mae_kzt":   { "mean": 4859484.753027042,   "std":   96921.73142584822  },
+    "mape":      { "mean": 0.07422347234204275, "std":   0.0001493749767099044 },
+    "rmse_kzt":  { "mean": 11938614.185092447,  "std":   1131041.0035486587 },
+    "r2":        { "mean": 0.9469946368953053,  "std":   0.009317890369975889 }
+  },
+  "hyperparameters": {
+    "n_estimators":       2500,
+    "learning_rate":      0.03,
+    "num_leaves":         255,
+    "min_child_samples":  30,
+    "reg_lambda":         10.0
+  }
+}

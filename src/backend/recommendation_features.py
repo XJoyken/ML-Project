@@ -6,8 +6,8 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 NumericFeatureName = Literal[
     "target_price_kzt",

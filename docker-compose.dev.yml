@@ -1,13 +1,7 @@
-# ═══════════════════════════════════════════════════════════════
-# Local development override — exposes ports directly, no Nginx/SSL
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-# ═══════════════════════════════════════════════════════════════
 services:
   backend:
     ports:
       - "8000:8000"
-    networks:
-      - internal
 
   frontend:
     ports:
@@ -16,17 +10,11 @@ services:
       context: ./frontend_next-1
       args:
         NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
-    networks:
-      - internal
 
-  # Disable nginx and certbot for local dev
-  nginx:
+  mlflow:
+    ports:
+      - "5000:5000"
+
+  tunnel:
     profiles:
       - production
-  certbot:
-    profiles:
-      - production
-
-networks:
-  internal:
-    driver: bridge

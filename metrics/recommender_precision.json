@@ -1,0 +1,532 @@
+{
+  "k_5": {
+    "k": 5,
+    "n_queries": 25,
+    "mean_precision": 0.664,
+    "median_precision": 1.0,
+    "hit_rate": 0.8,
+    "per_query": [
+      {
+        "id": "q01",
+        "prompt": "двухкомнатная квартира в ЖК до 40 млн рядом парк",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 91,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q02",
+        "prompt": "однушка до 25 млн не первый этаж рядом метро",
+        "precision": 0.8,
+        "hit": true,
+        "relevant_count": 4,
+        "returned_count": 5,
+        "candidates_passing_rule": 67,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q03",
+        "prompt": "трёшка в Бостандыкском районе до 60 млн",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 5,
+        "candidates_passing_rule": 950,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q04",
+        "prompt": "двухкомнатная квартира рядом школа и детский сад",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 8753,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q05",
+        "prompt": "квартира в новостройке до 30 млн ближе к центру",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 116,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q06",
+        "prompt": "однокомнатная в ЖК до 22 млн рядом университет",
+        "precision": 0.2,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 5,
+        "candidates_passing_rule": 1,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q07",
+        "prompt": "двушка рядом фитнес и супермаркет",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 11449,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q08",
+        "prompt": "трёхкомнатная квартира до 50 млн в Алмалинском районе",
+        "precision": 0.2,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 5,
+        "candidates_passing_rule": 685,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q09",
+        "prompt": "квартира до 35 млн рядом остановка",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 13089,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q10",
+        "prompt": "двушка не последний этаж до 45 млн рядом поликлиника",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 1743,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q11",
+        "prompt": "однокомнатная в центре до 28 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 277,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q12",
+        "prompt": "квартира в ЖК Самал",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 5,
+        "candidates_passing_rule": 1986,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q13",
+        "prompt": "трёшка от 40 до 60 млн рядом школа",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 3003,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q14",
+        "prompt": "двухкомнатная в Ауэзовском районе до 35 млн",
+        "precision": 0.2,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 5,
+        "candidates_passing_rule": 839,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q15",
+        "prompt": "однушка не первый этаж рядом парк и фитнес",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 619,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q16",
+        "prompt": "квартира с двумя комнатами в новостройке до 38 млн рядом детский сад",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 2156,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q17",
+        "prompt": "четырёхкомнатная квартира до 80 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 931,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q18",
+        "prompt": "двушка до 32 млн в Жетысуском районе рядом школа",
+        "precision": 0.2,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 5,
+        "candidates_passing_rule": 258,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q19",
+        "prompt": "трёшка в ЖК ближе к центру до 70 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 402,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q20",
+        "prompt": "однокомнатная рядом университет и метро",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 87,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q21",
+        "prompt": "двухкомнатная до 42 млн рядом больница",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 863,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q22",
+        "prompt": "квартира в Медеуском районе с двумя комнатами",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 53.060136984s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '53s'}]}}"
+        ]
+      },
+      {
+        "id": "q23",
+        "prompt": "трёшка не первый и не последний этаж до 65 млн",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 34.017825401s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '34s'}]}}"
+        ]
+      },
+      {
+        "id": "q24",
+        "prompt": "однушка в новостройке до 24 млн рядом ресторан или кафе",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 14.966534656s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '14s'}]}}"
+        ]
+      },
+      {
+        "id": "q25",
+        "prompt": "двушка от 25 до 40 млн рядом парк и школа",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 5,
+        "returned_count": 5,
+        "candidates_passing_rule": 444,
+        "unmapped_preferences": []
+      }
+    ]
+  },
+  "k_10": {
+    "k": 10,
+    "n_queries": 25,
+    "mean_precision": 0.644,
+    "median_precision": 1.0,
+    "hit_rate": 0.84,
+    "per_query": [
+      {
+        "id": "q01",
+        "prompt": "двухкомнатная квартира в ЖК до 40 млн рядом парк",
+        "precision": 0.8,
+        "hit": true,
+        "relevant_count": 8,
+        "returned_count": 10,
+        "candidates_passing_rule": 91,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q02",
+        "prompt": "однушка до 25 млн не первый этаж рядом метро",
+        "precision": 0.8,
+        "hit": true,
+        "relevant_count": 8,
+        "returned_count": 10,
+        "candidates_passing_rule": 67,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q03",
+        "prompt": "трёшка в Бостандыкском районе до 60 млн",
+        "precision": 0.2,
+        "hit": true,
+        "relevant_count": 2,
+        "returned_count": 10,
+        "candidates_passing_rule": 950,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q04",
+        "prompt": "двухкомнатная квартира рядом школа и детский сад",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 8753,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q05",
+        "prompt": "квартира в новостройке до 30 млн ближе к центру",
+        "precision": 0.9,
+        "hit": true,
+        "relevant_count": 9,
+        "returned_count": 10,
+        "candidates_passing_rule": 116,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q06",
+        "prompt": "однокомнатная в ЖК до 22 млн рядом университет",
+        "precision": 0.1,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 10,
+        "candidates_passing_rule": 1,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q07",
+        "prompt": "двушка рядом фитнес и супермаркет",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 11449,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q08",
+        "prompt": "трёхкомнатная квартира до 50 млн в Алмалинском районе",
+        "precision": 0.1,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 10,
+        "candidates_passing_rule": 685,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q09",
+        "prompt": "квартира до 35 млн рядом остановка",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 13089,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q10",
+        "prompt": "двушка не последний этаж до 45 млн рядом поликлиника",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 1743,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q11",
+        "prompt": "однокомнатная в центре до 28 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 277,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q12",
+        "prompt": "квартира в ЖК Самал",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 10,
+        "candidates_passing_rule": 1986,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q13",
+        "prompt": "трёшка от 40 до 60 млн рядом школа",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 3003,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q14",
+        "prompt": "двухкомнатная в Ауэзовском районе до 35 млн",
+        "precision": 0.1,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 10,
+        "candidates_passing_rule": 839,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q15",
+        "prompt": "однушка не первый этаж рядом парк и фитнес",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 619,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q16",
+        "prompt": "квартира с двумя комнатами в новостройке до 38 млн рядом детский сад",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 2156,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q17",
+        "prompt": "четырёхкомнатная квартира до 80 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 931,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q18",
+        "prompt": "двушка до 32 млн в Жетысуском районе рядом школа",
+        "precision": 0.1,
+        "hit": true,
+        "relevant_count": 1,
+        "returned_count": 10,
+        "candidates_passing_rule": 258,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q19",
+        "prompt": "трёшка в ЖК ближе к центру до 70 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 402,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q20",
+        "prompt": "однокомнатная рядом университет и метро",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 87,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q21",
+        "prompt": "двухкомнатная до 42 млн рядом больница",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 863,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q22",
+        "prompt": "квартира в Медеуском районе с двумя комнатами",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 7.666993833s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-2.5-flash-lite', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '7s'}]}}"
+        ]
+      },
+      {
+        "id": "q23",
+        "prompt": "трёшка не первый и не последний этаж до 65 млн",
+        "precision": 1.0,
+        "hit": true,
+        "relevant_count": 10,
+        "returned_count": 10,
+        "candidates_passing_rule": 4191,
+        "unmapped_preferences": []
+      },
+      {
+        "id": "q24",
+        "prompt": "однушка в новостройке до 24 млн рядом ресторан или кафе",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 24.890209678s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '24s'}]}}"
+        ]
+      },
+      {
+        "id": "q25",
+        "prompt": "двушка от 25 до 40 млн рядом парк и школа",
+        "precision": 0.0,
+        "hit": false,
+        "relevant_count": 0,
+        "returned_count": 0,
+        "candidates_passing_rule": 0,
+        "unmapped_preferences": [
+          "__error__: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\\nPlease retry in 5.865660471s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '5s'}]}}"
+        ]
+      }
+    ]
+  }
+}
