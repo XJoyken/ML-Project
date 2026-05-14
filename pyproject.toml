@@ -21,6 +21,7 @@ dependencies = [
     "uvicorn",
     "google-genai",
     "python-dotenv",
+    "streamlit",
 ]
 
 [project.optional-dependencies]

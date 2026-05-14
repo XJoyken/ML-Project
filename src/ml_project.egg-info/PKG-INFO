@@ -1,0 +1,22 @@
+Metadata-Version: 2.4
+Name: ml-project
+Version: 0.1.0
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scikit-learn
+Requires-Dist: catboost
+Requires-Dist: lightgbm
+Requires-Dist: xgboost
+Requires-Dist: mlflow
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: pydantic
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: google-genai
+Requires-Dist: python-dotenv
+Requires-Dist: streamlit
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: httpx; extra == "dev"

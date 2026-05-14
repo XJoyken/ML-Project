@@ -35,6 +35,15 @@ Shared:
 - `src/ml_project/tracking.py` — MLflow run/artifact helpers.
 - `src/backend/main.py` — FastAPI with `/apartments/evaluate`, `/apartments/investment`, `/recommendations`, `/recommendations/features`.
 
+Frontend (Streamlit, RU/EN):
+- `frontend/app.py` — entrypoint and page router (`st.session_state["page"]`).
+- `frontend/state.py` — session-state init + `navigate_to` / `go_back` helpers.
+- `frontend/i18n.py` — RU/EN translation dictionary and `t(key)` helper.
+- `frontend/styles.py` — dark-grey theme CSS (background, surface, accent), fade-in animation, badge / card / link styles.
+- `frontend/components.py` — reusable bits: warning banner, language toggle, listing-link pill, verdict badge, stat grid, loader context.
+- `frontend/api_client.py` — typed wrapper around the FastAPI endpoints.
+- `frontend/pages/{landing,model_select,model_evaluate,model_recommend,model_investment}.py` — five workflow pages.
+
 ## Setup
 
 ```powershell
@@ -114,6 +123,41 @@ Swagger UI at `http://localhost:8000/docs`. Three endpoints:
 
 - `POST /recommendations` — Gemini-extracted preferences → ranked list of listings
   with per-item explanation and overall summary.
+
+## Frontend (Next.js — primary)
+
+A Next.js 16 / React 19 frontend lives in `frontend_next/` and talks to the
+FastAPI backend. It supports Russian and English (sliding-pill toggle), has a
+static footer, equal-height model cards (whole card is clickable), dark text on
+gold buttons, and smooth `fadeUp` animations.
+
+```powershell
+cd frontend_next
+npm run dev        # dev server → http://localhost:3000
+npm run build      # production build
+```
+
+Backend URL is set via `NEXT_PUBLIC_BACKEND_URL` in `frontend_next/.env.local`
+(defaults to `http://localhost:8000`).
+
+Routes:
+- `/` — landing with hero and three model cards.
+- `/evaluate` — Model 1: sale-price verdict from krisha.kz URL.
+- `/recommend` — Model 2: natural-language prompt → ranked listings.
+- `/investment` — Model 3: rental ROI / NPV / IRR analysis.
+
+Design: `#1a1d23` background · `#252930` surface · `#e8d77c` gold accent ·
+dark text on gold buttons · sliding-pill RU/EN toggle · static footer.
+
+## Frontend (Streamlit — legacy)
+
+The original Streamlit UI lives in `frontend_streamlit/`.
+
+```powershell
+streamlit run frontend_streamlit/app.py
+```
+
+Opens at `http://localhost:8501`. Backend URL from `BACKEND_URL` in `.env`.
 
 ## Tests
 

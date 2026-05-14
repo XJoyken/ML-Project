@@ -96,7 +96,14 @@ def categorical_score(actual: str | None, target: str) -> float:
 def _score_equal(actual: float, target: float, feature: str) -> float:
     if feature == ROOMS_FEATURE:
         diff = abs(round(actual) - round(target))
-        return max(0.0, 1.0 - diff * 0.5)  # 0 diff=1.0, 1 diff=0.5, 2 diff=0.0
+        # Room count is almost always a hard requirement — a wrong room count is a
+        # near-zero match even with weight, so the scoring won't drag a "однушка" past
+        # a true "двушка" simply because POIs are better.
+        if diff == 0:
+            return 1.0
+        if diff == 1:
+            return 0.15
+        return 0.0
     if feature == PRICE_FEATURE:
         scale = max(abs(target) * PRICE_EQUAL_TOLERANCE, 1.0)
     else:

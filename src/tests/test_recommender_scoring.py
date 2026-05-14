@@ -34,8 +34,10 @@ def test_score_numeric_at_least_mirror():
 
 
 def test_score_numeric_equal_rooms_exact_and_off_by_one():
+    # Wrong room count must score near zero — otherwise the recommender surfaces a
+    # 1-room flat when the user explicitly asked for "двушка".
     assert score_numeric(actual=2.0, target=2.0, preference="equal", feature="rooms") == 1.0
-    assert score_numeric(actual=3.0, target=2.0, preference="equal", feature="rooms") == 0.5
+    assert score_numeric(actual=3.0, target=2.0, preference="equal", feature="rooms") == 0.15
     assert score_numeric(actual=4.0, target=2.0, preference="equal", feature="rooms") == 0.0
 
 

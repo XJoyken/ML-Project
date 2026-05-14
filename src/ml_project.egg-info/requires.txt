@@ -12,6 +12,8 @@ fastapi
 uvicorn
 google-genai
 python-dotenv
-httpx
-pytest
 streamlit
+
+[dev]
+pytest
+httpx

@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -19,6 +20,19 @@ from .recommendation_features import (
 )
 
 app = FastAPI(title="Almaty Apartment Recommender API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class FeatureExtractionRequest(BaseModel):
@@ -125,6 +139,11 @@ class InvestmentResponse(BaseModel):
     sale_evaluation: dict[str, Any]
     rent_evaluation: dict[str, Any]
     investment: dict[str, Any]
+    # Sensitivity scenarios — same economic assumptions, rent value swapped for the
+    # 90% conformal interval bounds. Lets the user see how achievable-rent variance
+    # shifts the verdict without changing any assumption.
+    investment_optimistic: dict[str, Any] | None = None  # rent = upper bound of 90% CI
+    investment_conservative: dict[str, Any] | None = None  # rent = lower bound of 90% CI
     market_summary: dict[str, Any]
     narrative: dict[str, Any]
 
@@ -311,13 +330,41 @@ def evaluate_investment(
         risk_premium_pct=override.risk_premium_pct,
         horizon_years=override.horizon_years,
     )
+    sale_price_kzt = float(sale_evaluation["listing_price_kzt"])
+    predicted_rent_kzt = float(rent_evaluation["predicted_rent_kzt"])
+
     investment = investment_module.compute_investment_metrics(
-        sale_price_kzt=float(sale_evaluation["listing_price_kzt"]),
-        monthly_rent_kzt=float(rent_evaluation["predicted_rent_kzt"]),
+        sale_price_kzt=sale_price_kzt,
+        monthly_rent_kzt=predicted_rent_kzt,
         params=params,
         inflation=inflation,
         market=market,
     ).as_dict()
+
+    # Sensitivity: recompute economics at the 90% rent-interval bounds. Same params,
+    # different achievable rent. Lets the user see how realistic variance shifts
+    # the verdict without changing any assumption.
+    investment_optimistic: dict[str, Any] | None = None
+    investment_conservative: dict[str, Any] | None = None
+    rent_interval = rent_evaluation.get("rent_interval") or {}
+    rent_high = rent_interval.get("high_kzt")
+    rent_low = rent_interval.get("low_kzt")
+    if rent_high is not None and float(rent_high) > 0:
+        investment_optimistic = investment_module.compute_investment_metrics(
+            sale_price_kzt=sale_price_kzt,
+            monthly_rent_kzt=float(rent_high),
+            params=params,
+            inflation=inflation,
+            market=market,
+        ).as_dict()
+    if rent_low is not None and float(rent_low) > 0:
+        investment_conservative = investment_module.compute_investment_metrics(
+            sale_price_kzt=sale_price_kzt,
+            monthly_rent_kzt=float(rent_low),
+            params=params,
+            inflation=inflation,
+            market=market,
+        ).as_dict()
 
     narrative = narrative_module.generate(
         investment=investment,
@@ -334,6 +381,8 @@ def evaluate_investment(
         sale_evaluation=sale_evaluation,
         rent_evaluation=rent_evaluation,
         investment=investment,
+        investment_optimistic=investment_optimistic,
+        investment_conservative=investment_conservative,
         market_summary=market_summary,
         narrative=narrative.model_dump(),
     )

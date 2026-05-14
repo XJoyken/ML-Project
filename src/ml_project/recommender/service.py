@@ -122,12 +122,20 @@ class RecommendationService:
         if plan.is_empty():
             raise ValueError("Prompt did not map to any supported recommender features.")
 
-        candidate_mask = self._hard_filter_mask(plan)
+        # Tiered hard-filter relaxation. We never drop the user's core requirements
+        # (rooms / price / ЖК / district) just because a POI proximity filter was too
+        # tight — that would surface 1-room apartments when the user asked for 2.
+        #
+        # Tier 1 — all hards (max strictness).
+        # Tier 2 — drop POI distance hards, keep CORE_HARD_FEATURES.
+        # Tier 3 — drop everything except district exclusion.
+        candidate_mask = self._hard_filter_mask(plan, relax_level=0)
         candidate_indices = np.flatnonzero(candidate_mask.to_numpy())
-
         if len(candidate_indices) < limit:
-            # Fall back to full pool if hard filters were too restrictive.
-            relaxed_mask = self._hard_filter_mask(plan, drop_hard=True)
+            relaxed_mask = self._hard_filter_mask(plan, relax_level=1)
+            candidate_indices = np.flatnonzero(relaxed_mask.to_numpy())
+        if len(candidate_indices) < limit:
+            relaxed_mask = self._hard_filter_mask(plan, relax_level=2)
             candidate_indices = np.flatnonzero(relaxed_mask.to_numpy())
 
         scored = self._score_candidates(plan, candidate_indices, prioritize_air_quality)
@@ -217,7 +225,26 @@ class RecommendationService:
                 plan.excluded_districts.append(value)
         return plan
 
-    def _hard_filter_mask(self, plan: QueryPlan, *, drop_hard: bool = False) -> pd.Series:
+    # Features the user typically considers non-negotiable. Even when we relax POI
+    # distances to widen the pool, we keep these strict so that a "двушка" query never
+    # returns a "однушка".
+    CORE_HARD_FEATURES = frozenset({
+        "rooms",
+        "target_price_kzt",
+        "has_complex_id",
+        "is_first_floor",
+        "is_last_floor",
+    })
+
+    def _hard_filter_mask(self, plan: QueryPlan, *, relax_level: int = 0) -> pd.Series:
+        """Return a boolean mask of candidate listings.
+
+        relax_level:
+          0 — apply ALL hard filters (weight ≥ HARD_WEIGHT_THRESHOLD).
+          1 — drop POI distance hards (anything not in CORE_HARD_FEATURES). Keeps rooms,
+              price, ЖК, floor, district categorical filters.
+          2 — drop every hard filter; only district exclusions remain.
+        """
         mask = pd.Series(True, index=self.features.index)
 
         # District exclusions are ALWAYS hard — even when the rest of the filters
@@ -229,11 +256,13 @@ class RecommendationService:
                 column = self.features["district"].astype("string").str.lower()
                 mask &= ~column.isin(excluded_lower)
 
-        if drop_hard:
+        if relax_level >= 2:
             return mask
 
         for target in plan.numeric_targets + plan.boolean_targets:
             if target.weight < HARD_WEIGHT_THRESHOLD:
+                continue
+            if relax_level >= 1 and target.feature not in self.CORE_HARD_FEATURES:
                 continue
             actual = self.features[target.feature].to_numpy(dtype=float)
             keep = np.array(
@@ -251,6 +280,8 @@ class RecommendationService:
 
         for target in plan.categorical_targets:
             if target.weight < HARD_WEIGHT_THRESHOLD:
+                continue
+            if relax_level >= 1 and target.feature != "district":
                 continue
             column = self.features[target.feature].astype("string").str.lower()
             mask &= column.eq(str(target.value).lower())
@@ -421,6 +452,13 @@ class RecommendationService:
             "price_kzt": _optional_float(listing.get("target_price_kzt")),
             "rooms": _optional_float(listing.get("rooms")),
             "area_m2": _optional_float(listing.get("area_m2")),
+            "floor_current": _optional_float(listing.get("floor_current")),
+            "floors_total": _optional_float(listing.get("floors_total")),
+            "year_built": _optional_float(listing.get("year_built")),
+            "condition": _optional_str(listing.get("condition")),
+            "house_type": _optional_str(listing.get("house_type")),
+            "ceiling_height_m": _optional_float(listing.get("ceiling_height_m")),
+            "dist_to_center_km": _optional_float(listing.get("dist_to_center_km")),
             "district": _optional_str(listing.get("district")),
             "microdistrict": _optional_str(listing.get("microdistrict")),
             "lat": lat,

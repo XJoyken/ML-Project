@@ -214,7 +214,15 @@ Required content per paragraph:
   "ставка дисконтирования 15.3% чувствительна к инфляции — рост до 18% снизит NPV на ~X млн ₸".
   Make risks feel like they belong to THIS specific apartment, not generic advice.
 
-- verdict + verdict_text: copy verdict from `investment.verdict`, write ONE sentence with the final call.
+- verdict + verdict_text: copy verdict from `investment.verdict`, write ONE sentence with the final call,
+  then add ONE supporting sentence that explains WHY the verdict is what it is given the Kazakhstan
+  macro context. Use these calibration thresholds explicitly so the reader understands the rule:
+    excellent — inflation-adjusted payback < 8 yr · good — < 12 yr · average — < 16 yr · poor — ≥ 16 yr.
+  When the verdict is "poor" or "average" because of the discount rate, say so plainly. Example (RU):
+    "Инвестиция оценена как «плохо»: при инфляции 12.3% и риск-премии 3 пп ставка дисконтирования
+     15.3% — реальная окупаемость растягивается до 20+ лет. Чтобы попасть в «хорошо», нужна валовая
+     доходность 10%+ или снижение цены покупки на ~15%."
+  If the user lowers risk_premium toward zero, the verdict can improve — say so when honest.
 
 Do not output JSON outside the schema fields. Do not use markdown formatting characters (no **, no ##).
 """.strip()
