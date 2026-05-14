@@ -7,3 +7,16 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+
+  frontend:
+    build: ./frontend_next-1
+    container_name: ml-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # фронт ходит на бэк по имени сервиса в докер-сети
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
