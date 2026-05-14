@@ -9,4 +9,5 @@ CMD ["mlflow", "server", \
      "--port", "5000", \
      "--backend-store-uri", "sqlite:///data/mlflow.db", \
      "--default-artifact-root", "/data/mlruns", \
-     "--allowed-hosts", "ml.xjoyken.dev,localhost"]
+     "--allowed-hosts", "ml.xjoyken.dev,localhost", \
+     "--cors-allowed-origins", "https://ml.xjoyken.dev,http://localhost:5000"]
