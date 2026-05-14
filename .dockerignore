@@ -1,27 +1,51 @@
+# VCS
 .git
 .gitignore
 .gitattributes
+
+# IDE
 .idea
 .vscode
 .DS_Store
 
+# Python env
+venv/
 .venv/
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
 .ipynb_checkpoints/
+src/ml_project.egg-info/
 
+# Secrets
 .env
 .env.local
+.env.*.local
 
+# MLflow local state (mounted as volumes)
 mlruns/
 mlflow.db*
 mlartifacts/
 catboost_info/
 
+# Data & models (mounted as volumes, not baked into image)
+datasets/
+models/
+
+# Frontend (has its own Dockerfile)
+frontend_next-1/
+
+# Notebooks
 notebooks/
 
+# Docker meta
 Dockerfile
+docker-compose.yml
 .dockerignore
 README.md
+
+# Nginx/SSL config
+nginx/
+certbot/
+init-ssl.sh

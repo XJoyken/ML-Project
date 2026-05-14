@@ -2,21 +2,56 @@ services:
   backend:
     build: .
     container_name: ml-backend
-    ports:
-      - "8000:8000"
+    volumes:
+      - ./datasets:/app/datasets:ro
+      - ./models:/app/models:ro
+      - ./mlruns:/app/mlruns:ro
+      - ./mlflow.db:/app/mlflow.db:ro
     env_file:
       - .env
+    networks:
+      - internal
     restart: unless-stopped
 
   frontend:
-    build: ./frontend_next-1
+    build:
+      context: ./frontend_next-1
+      args:
+        NEXT_PUBLIC_BACKEND_URL: https://api.xjoyken.dev
     container_name: ml-frontend
-    ports:
-      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: ml-mlflow
+    volumes:
+      - ./mlflow.db:/data/mlflow.db
+      - ./mlruns:/data/mlruns
+    networks:
+      - internal
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: ml-tunnel
+    command: tunnel --no-autoupdate run
     environment:
-      # фронт ходит на бэк по имени сервиса в докер-сети
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-      - BACKEND_URL=http://backend:8000
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - internal
     depends_on:
       - backend
+      - frontend
+      - mlflow
     restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge

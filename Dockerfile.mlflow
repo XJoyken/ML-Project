@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir mlflow==3.12.0
+
+EXPOSE 5000
+
+CMD ["mlflow", "server", \
+     "--host", "0.0.0.0", \
+     "--port", "5000", \
+     "--backend-store-uri", "sqlite:///data/mlflow.db", \
+     "--default-artifact-root", "/data/mlruns", \
+     "--allowed-hosts", "ml.xjoyken.dev,localhost"]

@@ -120,6 +120,32 @@ def build_parser() -> argparse.ArgumentParser:
     tune_rent_parser.add_argument("--inner-splits", type=int, default=3)
     tune_rent_parser.add_argument("--seed", type=int, default=42)
 
+    eval_rec_parser = subparsers.add_parser(
+        "eval-recommender",
+        help="Offline Precision@K on hand-curated queries.",
+    )
+    eval_rec_parser.add_argument(
+        "--queries", default="metrics/eval_queries.json",
+        help="Path to query→relevance JSON.",
+    )
+    eval_rec_parser.add_argument(
+        "--output", default="metrics/recommender_precision.json",
+        help="Where to write the result JSON.",
+    )
+    eval_rec_parser.add_argument(
+        "--k", nargs="+", type=int, default=[5, 10],
+        help="K values to evaluate at (e.g. --k 5 10).",
+    )
+
+    eval_inv_parser = subparsers.add_parser(
+        "eval-investment",
+        help="ROI / yield / payback distribution across every listing in the processed frame.",
+    )
+    eval_inv_parser.add_argument(
+        "--output", default="metrics/investment_roi.json",
+        help="Where to write the result JSON.",
+    )
+
     return parser
 
 
@@ -242,6 +268,36 @@ def main(argv: list[str] | None = None) -> int:
             result = predict_price(listing=payload, **common_kwargs)
 
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "eval-recommender":
+        from ml_project.evals.recommender_eval import run_eval as run_rec_eval
+
+        queries_path = Path(args.queries)
+        output_path = Path(args.output)
+        results = run_rec_eval(
+            queries_path=queries_path,
+            output_path=output_path,
+            k_values=tuple(args.k),
+        )
+        for key, block in results.items():
+            print(f"{key}: mean_precision={block['mean_precision']:.4f}, "
+                  f"median={block['median_precision']:.4f}, hit_rate={block['hit_rate']:.4f} "
+                  f"(over {block['n_queries']} queries)")
+        print(f"\nFull results written to {output_path}")
+        return 0
+
+    if args.command == "eval-investment":
+        from ml_project.evals.investment_eval import evaluate_full_dataset
+
+        output_path = Path(args.output)
+        payload = evaluate_full_dataset(output_path=output_path)
+        base = payload["base_scenario"]
+        print(f"Listings scored: {base['n_listings']}")
+        print(f"Verdict shares: {base['verdict_shares']}")
+        print(f"Gross yield (median): {base['metrics']['gross_yield_pct'].get('median')}%")
+        print(f"Real payback (median): {base['metrics']['payback_years_inflation_adjusted'].get('median')} yr")
+        print(f"\nFull results written to {output_path}")
         return 0
 
     parser.error("Unknown command.")
