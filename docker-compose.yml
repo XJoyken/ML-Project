@@ -11,6 +11,8 @@ services:
       - .env
     networks:
       - internal
+    ports:
+      - "8000:8000"
     restart: unless-stopped
 
   frontend:
