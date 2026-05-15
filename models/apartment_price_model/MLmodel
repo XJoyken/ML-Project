@@ -1,4 +1,4 @@
-artifact_path: file:D:/Code/2-course/ML/ml-project-git/ML-Project/mlruns/2/models/m-2021a5013d1f40c4aed759bcf605faed/artifacts
+artifact_path: file:D:/Code/2-course/ML/ml-project-git/ML-Project/mlruns/2/models/m-33eda6e6c97d4727b0a346623ebfceae/artifacts
 flavors:
   lightgbm:
     code: null
@@ -145,9 +145,9 @@ metadata:
   - district_crime_index
   target_column: target_price_kzt
 mlflow_version: 3.12.0
-model_id: m-2021a5013d1f40c4aed759bcf605faed
-model_size_bytes: 15222541
-model_uuid: m-2021a5013d1f40c4aed759bcf605faed
+model_id: m-33eda6e6c97d4727b0a346623ebfceae
+model_size_bytes: 46812572
+model_uuid: m-33eda6e6c97d4727b0a346623ebfceae
 prompts: null
-run_id: c90c3d2600f54cee90f770c226e4ed0e
-utc_time_created: '2026-05-12 21:34:19.477162'
+run_id: 24cdf43abbef4607b11c8828674239f7
+utc_time_created: '2026-05-15 11:58:40.892662'

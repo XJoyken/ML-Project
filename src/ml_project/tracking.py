@@ -18,14 +18,14 @@ def log_training_run(
     model,
     schema: FeatureSchema,
     train_frame: pd.DataFrame,
-    valid_frame: pd.DataFrame,
-    metrics_frame: pd.DataFrame,
+    valid_frame: pd.DataFrame | None,
+    metrics_frame: pd.DataFrame | None,
     processed_rows: int,
     validation_rows: int,
     test_size: float,
     random_state: int,
+    full: bool = False,
 ):
-    metrics = metrics_frame.drop(columns=["model"]).iloc[0].to_dict()
     params = {
         "model": model_name,
         "test_size": test_size,
@@ -33,15 +33,19 @@ def log_training_run(
         "processed_rows": processed_rows,
         "validation_rows": validation_rows,
         "feature_count": len(schema.feature_columns),
+        "full_dataset": full,
         **model.params,
     }
 
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=model_name):
         mlflow.log_params(params)
-        mlflow.log_metrics({key: float(value) for key, value in metrics.items()})
+        if metrics_frame is not None:
+            metrics = metrics_frame.drop(columns=["model"]).iloc[0].to_dict()
+            mlflow.log_metrics({key: float(value) for key, value in metrics.items()})
         log_dataset(train_frame, name="processed_train", context="training")
-        log_dataset(valid_frame, name="processed_validation", context="validation")
+        if valid_frame is not None:
+            log_dataset(valid_frame, name="processed_validation", context="validation")
         mlflow.log_dict(schema.to_dict(), "schema.json")
         model.log_to_mlflow(name="model", metadata=run_metadata(schema))
 

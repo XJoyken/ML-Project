@@ -35,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Two-pass: ES finds best_iter, then refit on full train without ES.",
     )
+    train_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Train on 100%% of the data (no validation split, no metrics). Mutually exclusive with --final.",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a model.")
     evaluate_parser.add_argument("--model", default="lightgbm", choices=model_choices)
@@ -93,6 +98,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--final",
         action="store_true",
         help="Two-pass: ES finds best_iter, then refit on full train without ES.",
+    )
+    train_rent_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Train on 100%% of the data (no validation split, no metrics). Mutually exclusive with --final.",
     )
 
     evaluate_rent_parser = subparsers.add_parser("evaluate-rent", help="Evaluate the rent model.")
@@ -165,10 +175,14 @@ def main(argv: list[str] | None = None) -> int:
             experiment_name=experiment_name,
             model_params=model_params,
             final=getattr(args, "final", False),
+            full=getattr(args, "full", False),
         )
         print(f"Processed rows: {len(result['processed_frame']):,}")
         print(f"MLflow experiment: {experiment_name}")
-        print(result["metrics_frame"].round(4).to_string(index=False))
+        if result["metrics_frame"] is not None:
+            print(result["metrics_frame"].round(4).to_string(index=False))
+        else:
+            print("Trained on 100% of the data (no validation metrics).")
         return 0
 
     if args.command == "evaluate":
@@ -211,10 +225,14 @@ def main(argv: list[str] | None = None) -> int:
             experiment_name=args.experiment_name,
             model_params=_load_model_params(args.params),
             final=args.final,
+            full=args.full,
         )
         print(f"Processed rows: {len(result['processed_frame']):,}")
         print(f"MLflow experiment: {args.experiment_name}")
-        print(result["metrics_frame"].round(4).to_string(index=False))
+        if result["metrics_frame"] is not None:
+            print(result["metrics_frame"].round(4).to_string(index=False))
+        else:
+            print("Trained on 100% of the data (no validation metrics).")
         return 0
 
     if args.command == "evaluate-rent":

@@ -39,7 +39,11 @@ def train_rent_model(
     log_to_mlflow: bool = True,
     experiment_name: str = RENT_MLFLOW_EXPERIMENT_NAME,
     final: bool = False,
+    full: bool = False,
 ) -> dict[str, Any]:
+    if full and final:
+        raise ValueError("--full and --final are mutually exclusive.")
+
     listings = load_rent_listings(ads_path=ads_path)
     poi_catalog = load_poi_catalog(poi_sources=poi_sources or POI_SOURCE_FILES)
     air_catalog = load_air_catalog(raw_path=air_quality_path or AIR_QUALITY_RAW_PATH)
@@ -52,28 +56,39 @@ def train_rent_model(
         save_path=processed_path if save_processed else None,
     )
 
-    train_frame, valid_frame = train_test_split(
-        processed,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=stratify_bins(processed[schema.target_column]),
-    )
     model = create_model(model_name, **(model_params or {}))
-    model.fit(train_frame, schema)
-    if final:
-        best_iter = model.best_iteration()
-        print(f"Pass 1 finished, best_iteration={best_iter}. Refitting on full train without ES.")
-        model.refit_no_es(train_frame, schema)
-    predictions = model.predict(valid_frame, schema)
 
-    metrics_frame = pd.DataFrame(
-        [
-            {
-                "model": model_name,
-                **calculate_metrics(valid_frame[schema.target_column], predictions),
-            }
-        ]
-    )
+    if full:
+        model.fit(processed, schema)
+        best_iter = model.best_iteration()
+        print(f"Pass 1 finished, best_iteration={best_iter}. Refitting on full dataset without ES.")
+        model.refit_no_es(processed, schema)
+        metrics_frame: pd.DataFrame | None = None
+        train_frame = processed
+        valid_frame: pd.DataFrame | None = None
+        validation_rows = 0
+    else:
+        train_frame, valid_frame = train_test_split(
+            processed,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=stratify_bins(processed[schema.target_column]),
+        )
+        model.fit(train_frame, schema)
+        if final:
+            best_iter = model.best_iteration()
+            print(f"Pass 1 finished, best_iteration={best_iter}. Refitting on full train without ES.")
+            model.refit_no_es(train_frame, schema)
+        predictions = model.predict(valid_frame, schema)
+        metrics_frame = pd.DataFrame(
+            [
+                {
+                    "model": model_name,
+                    **calculate_metrics(valid_frame[schema.target_column], predictions),
+                }
+            ]
+        )
+        validation_rows = len(valid_frame)
 
     if log_to_mlflow:
         log_training_run(
@@ -85,9 +100,10 @@ def train_rent_model(
             valid_frame=valid_frame,
             metrics_frame=metrics_frame,
             processed_rows=len(processed),
-            validation_rows=len(valid_frame),
-            test_size=test_size,
+            validation_rows=validation_rows,
+            test_size=0.0 if full else test_size,
             random_state=random_state,
+            full=full,
         )
 
     return {
