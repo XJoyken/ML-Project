@@ -37,9 +37,19 @@ FallbackReason = Literal[
     "unknown",
 ]
 
-# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+# Primary model: full-strength Gemini 3 Flash.
+# Fallback model: cheaper / higher-quota Gemini 3.1 Flash Lite — used automatically
+# when the primary model returns RATE_LIMITED (429) or UNAVAILABLE/OVERLOAD (503).
+# Both can be overridden at runtime via the GEMINI_MODEL / GEMINI_FALLBACK_MODEL env vars.
+DEFAULT_GEMINI_MODEL = "gemini-3-flash"
+DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
+# Errors that should trigger an automatic switch to the fallback model
+# (instead of immediately giving up and using the deterministic template).
+_RETRYABLE_FALLBACK_REASONS: tuple[FallbackReason, ...] = (
+    "rate_limited",
+    "transient_overload",
+)
 
 class NarrativeReport(BaseModel):
     language: Language = Field(description="Output language.")
@@ -273,7 +283,7 @@ def generate(
                 structured=structured,
                 language=language,
                 client=llm_client,
-                model=llm_model or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+                model=llm_model,
             )
             report.source = "gemini"
             return report
@@ -290,6 +300,48 @@ def generate(
             return report
 
     return _generate_deterministic(structured=structured, language=language)
+
+
+def _resolve_model_chain(primary: str | None = None) -> list[str]:
+    """Return [primary, fallback] de-duped — the order in which to try Gemini models.
+
+    Both can be overridden via env: GEMINI_MODEL and GEMINI_FALLBACK_MODEL.
+    Passing primary=None resolves it from env / DEFAULT_GEMINI_MODEL.
+    """
+    if primary is None:
+        primary = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
+    fallback = os.getenv("GEMINI_FALLBACK_MODEL", DEFAULT_GEMINI_FALLBACK_MODEL)
+    chain = [primary]
+    if fallback and fallback != primary:
+        chain.append(fallback)
+    return chain
+
+
+def _call_with_model_fallback(call_fn: Any, models: list[str], *, log_prefix: str = "gemini") -> Any:
+    """Try `call_fn(model)` for each model in order.
+
+    On RATE_LIMITED / TRANSIENT_OVERLOAD errors from a non-final model, switch to the
+    next one. All other errors (auth, invalid request, unknown) re-raise immediately —
+    the caller's outer except will then activate the deterministic template fallback.
+    """
+    last_exc: Exception | None = None
+    for index, model in enumerate(models):
+        try:
+            return call_fn(model)
+        except Exception as exc:
+            last_exc = exc
+            reason = _classify_llm_error(exc)
+            has_next = index < len(models) - 1
+            if has_next and reason in _RETRYABLE_FALLBACK_REASONS:
+                print(
+                    f"[{log_prefix}] model {model!r} hit {reason} — retrying with {models[index + 1]!r}",
+                    file=sys.stderr,
+                )
+                continue
+            raise
+    # Unreachable: loop either returns or raises. Kept for type-checkers.
+    assert last_exc is not None
+    raise last_exc
 
 
 def _classify_llm_error(exc: Exception) -> FallbackReason:
@@ -432,7 +484,7 @@ def _generate_with_gemini(
     structured: StructuredEvaluation,
     language: Language,
     client: Any | None,
-    model: str,
+    model: str | None,
 ) -> NarrativeReport:
     from google import genai
     from google.genai import types
@@ -442,17 +494,23 @@ def _generate_with_gemini(
 
     system_prompt = _system_prompt(language)
     user_payload = json.dumps(_structured_payload(structured), ensure_ascii=False)
-    response = client.models.generate_content(
-        model=model,
-        contents=user_payload,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=0.2,
-            response_mime_type="application/json",
-            response_json_schema=NarrativeReport.model_json_schema(),
-        ),
+
+    def _call(model_name: str) -> NarrativeReport:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user_payload,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2,
+                response_mime_type="application/json",
+                response_json_schema=NarrativeReport.model_json_schema(),
+            ),
+        )
+        return NarrativeReport.model_validate_json(response.text)
+
+    report = _call_with_model_fallback(
+        _call, _resolve_model_chain(model), log_prefix="narrative"
     )
-    report = NarrativeReport.model_validate_json(response.text)
     _strip_proper_noun_quotes_in_place(report)
     return report
 

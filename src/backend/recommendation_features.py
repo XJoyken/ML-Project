@@ -6,8 +6,22 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+from ml_project.narrative import (
+    DEFAULT_GEMINI_FALLBACK_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    _call_with_model_fallback,
+    _resolve_model_chain,
+)
+
+# Re-exported so callers that already do `from .recommendation_features import DEFAULT_GEMINI_MODEL`
+# keep working without churn.
+__all__ = [
+    "DEFAULT_GEMINI_MODEL",
+    "DEFAULT_GEMINI_FALLBACK_MODEL",
+    "ExtractedRecommendationFeatures",
+    "GeminiFeatureExtractor",
+    "parse_features_json",
+]
 
 NumericFeatureName = Literal[
     "target_price_kzt",
@@ -314,14 +328,19 @@ class GeminiFeatureExtractor:
         self.client = client or genai.Client()
 
     def extract(self, user_prompt: str) -> ExtractedRecommendationFeatures:
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=FEATURE_EXTRACTION_SYSTEM_PROMPT,
-                temperature=0.0,
-                response_mime_type="application/json",
-                response_json_schema=ExtractedRecommendationFeatures.model_json_schema(),
-            ),
+        def _call(model_name: str) -> ExtractedRecommendationFeatures:
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=FEATURE_EXTRACTION_SYSTEM_PROMPT,
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                    response_json_schema=ExtractedRecommendationFeatures.model_json_schema(),
+                ),
+            )
+            return parse_features_json(response.text)
+
+        return _call_with_model_fallback(
+            _call, _resolve_model_chain(self.model), log_prefix="features"
         )
-        return parse_features_json(response.text)

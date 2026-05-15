@@ -9,12 +9,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ..narrative import (
-    DEFAULT_GEMINI_MODEL,
     FallbackReason,
     Language,
     NarrativeSource,
+    _call_with_model_fallback,
     _classify_llm_error,
     _fallback_reason_message,
+    _resolve_model_chain,
     _strip_proper_noun_quotes,
 )
 from .investment import InvestmentResult, InvestmentVerdict
@@ -73,7 +74,7 @@ def generate(
                 market_summary=market_summary,
                 language=language,
                 client=llm_client,
-                model=llm_model or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+                model=llm_model,
             )
             report.source = "gemini"
             _strip_quotes_in_place(report)
@@ -113,7 +114,7 @@ def _generate_with_gemini(
     market_summary: dict[str, Any],
     language: Language,
     client: Any | None,
-    model: str,
+    model: str | None,
 ) -> InvestmentNarrative:
     from google import genai
     from google.genai import types
@@ -140,17 +141,23 @@ def _generate_with_gemini(
         "market": market_summary,
     }
     user_payload = json.dumps(payload, ensure_ascii=False)
-    response = client.models.generate_content(
-        model=model,
-        contents=user_payload,
-        config=types.GenerateContentConfig(
-            system_instruction=_system_prompt(language),
-            temperature=0.2,
-            response_mime_type="application/json",
-            response_json_schema=InvestmentNarrative.model_json_schema(),
-        ),
+
+    def _call(model_name: str) -> InvestmentNarrative:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user_payload,
+            config=types.GenerateContentConfig(
+                system_instruction=_system_prompt(language),
+                temperature=0.2,
+                response_mime_type="application/json",
+                response_json_schema=InvestmentNarrative.model_json_schema(),
+            ),
+        )
+        return InvestmentNarrative.model_validate_json(response.text)
+
+    return _call_with_model_fallback(
+        _call, _resolve_model_chain(model), log_prefix="investment"
     )
-    return InvestmentNarrative.model_validate_json(response.text)
 
 
 def _system_prompt(language: Language) -> str:
